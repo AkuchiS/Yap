@@ -47,6 +47,12 @@ def _cmd_devices(_args) -> int:
     return 0
 
 
+def _cmd_doctor(args) -> int:
+    from . import doctor
+
+    return doctor.run(config.load(), prompt=args.prompt, seconds=args.seconds)
+
+
 def _cmd_config(args) -> int:
     if args.action == "path":
         print(config.config_path())
@@ -106,6 +112,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     pd = sub.add_parser("devices", help="list microphone input devices")
     pd.set_defaults(func=_cmd_devices)
+
+    pdoc = sub.add_parser("doctor", help="diagnose permissions, hotkey, mic, clipboard")
+    pdoc.add_argument("--prompt", action="store_true",
+                      help="pop the macOS 'allow control' permission dialog")
+    pdoc.add_argument("--seconds", type=int, default=12,
+                      help="how long to watch for key events (default 12)")
+    pdoc.set_defaults(func=_cmd_doctor)
 
     pc = sub.add_parser("config", help="manage configuration")
     pc.add_argument("action", choices=["path", "init", "show", "set"])
