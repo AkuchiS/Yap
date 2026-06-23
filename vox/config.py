@@ -54,11 +54,18 @@ DEFAULT_CONFIG: dict[str, Any] = {
         ),
     },
     "hotkey": {
-        # pynput combo syntax, e.g. "<ctrl>+<alt>", "<cmd>+<shift>", "<f9>".
-        "combo": "<ctrl>+<alt>",
-        # "toggle": press once to start, again to stop.
+        # Default: push-to-talk on a single key (like Wispr's "hold to dictate").
+        # macOS uses Right Option (⌥); elsewhere Right Ctrl. Both are one-finger
+        # holds that don't collide with normal typing.
+        #
+        # NOTE: the macOS Fn/🌐 key can't be used here — it emits no real keypress,
+        # only a hidden hardware flag that pynput cannot see. Good single-key
+        # alternatives: "<alt_r>" (Right Option), "<cmd_r>" (Right ⌘), "<f9>".
+        # For two-key combos use pynput syntax, e.g. "<ctrl>+<alt>".
+        "combo": "<alt_r>" if sys.platform == "darwin" else "<ctrl_r>",
         # "hold"  : record only while the combo is held down (push-to-talk).
-        "mode": "toggle",
+        # "toggle": press once to start, press again to stop.
+        "mode": "hold",
     },
     "inject": {
         "method": "paste",           # "paste" (clipboard + Ctrl/Cmd+V) | "type"

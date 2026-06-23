@@ -83,3 +83,15 @@ def describe_mode(mode: str, combo: str) -> str:
     if mode == "hold":
         return f"Hold {combo} and speak; release to transcribe."
     return f"Press {combo} to start, press again to stop & transcribe."
+
+
+def combo_warning(combo: str) -> str | None:
+    """Return a friendly heads-up if the chosen combo is known to be unusable."""
+    norm = combo.lower().replace("<", "").replace(">", "")
+    if "fn" in norm.split("+"):
+        return (
+            "The Fn/🌐 key can't be captured (it emits no real keypress, just a "
+            "hardware flag). Try '<alt_r>' (Right Option), '<cmd_r>' (Right ⌘), "
+            "or '<f9>' instead:  vox config set hotkey.combo '\"<alt_r>\"'"
+        )
+    return None

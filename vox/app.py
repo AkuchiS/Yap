@@ -11,7 +11,7 @@ import numpy as np
 
 from . import cleanup
 from .audio import Recorder
-from .hotkey import HotkeyListener, describe_mode
+from .hotkey import HotkeyListener, combo_warning, describe_mode
 from .inject import Injector
 from .stt import build_engine
 
@@ -82,6 +82,9 @@ class App:
         mode = self.cfg["hotkey"]["mode"]
 
         print(f"vox {_version()} — engine: {self.engine.name}", file=sys.stderr)
+        warn = combo_warning(combo)
+        if warn:
+            print(f"vox: warning: {warn}", file=sys.stderr)
         print(describe_mode(mode, combo), file=sys.stderr)
         print("Warming up model…", file=sys.stderr)
         try:

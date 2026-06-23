@@ -71,13 +71,24 @@ vox config show               # print effective config
 vox config path               # where the config file lives
 ```
 
-Press **Ctrl+Alt** (default) to start recording, press again to stop and type.
-Prefer push-to-talk? Switch to hold mode:
+By default vox is **push-to-talk on a single key** (like Wispr's "hold to
+dictate"): **hold Right Option ⌥** on macOS (Right Ctrl elsewhere), speak, and
+release to transcribe.
+
+### Choosing a hotkey
 
 ```bash
-vox config set hotkey.mode '"hold"'        # record only while the keys are held
-vox config set hotkey.combo '"<cmd>+<shift>"'
+vox config set hotkey.combo '"<alt_r>"'    # Right Option ⌥ (macOS default)
+vox config set hotkey.combo '"<cmd_r>"'    # Right Command
+vox config set hotkey.combo '"<f9>"'       # a function key
+vox config set hotkey.combo '"<ctrl>+<alt>"'   # a two-key combo
+vox config set hotkey.mode  '"toggle"'     # press to start, press to stop
 ```
+
+> **Why not the Fn / 🌐 key?** It's the obvious one-finger choice, but on macOS
+> the Fn key emits no real keypress — only a hidden hardware flag — so the
+> cross-platform input library can't see it. Right Option gives you the same
+> one-key feel and works reliably. (A native Fn backend is on the roadmap.)
 
 ## Configuration
 
