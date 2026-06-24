@@ -21,6 +21,8 @@ multiprocessing.freeze_support()  # handles the --multiprocessing-fork relaunch
 from yap.cli import main
 
 if len(sys.argv) == 1:
-    sys.argv.append("app")
+    # macOS has the menu-bar app; elsewhere fall back to the run daemon so a
+    # double-clicked yap.exe / binary actually starts dictating.
+    sys.argv.append("app" if sys.platform == "darwin" else "run")
 
 raise SystemExit(main())
