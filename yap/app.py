@@ -57,9 +57,11 @@ class App:
 
         self._record_thread = threading.Thread(target=_rec, daemon=True)
         self._record_thread.start()
-        self.integration.record_started()  # tell other voice apps: pause
+        # tell other voice apps: pause — and remember which app we're dictating into
+        self._active_app = self.integration.record_started()
         self._status("listening")
-        self._log("● listening…", 1)
+        app_note = f" → {self._active_app}" if self._active_app else ""
+        self._log(f"● listening…{app_note}", 1)
 
     def on_stop(self):
         self._stop_event.set()
@@ -105,7 +107,8 @@ class App:
 
                 traceback.print_exc()
         finally:
-            self.integration.record_stopped()  # tell other voice apps: resume
+            # resume other voice apps, reporting the same app we paused for
+            self.integration.record_stopped(getattr(self, "_active_app", None))
             self._status("idle")
             self._busy.release()
 

@@ -83,7 +83,7 @@ that stays responsive: `tiny.en` on very old/light machines, `base.en` on a
 CUDA. Run `yap hardware` to see the pick, or pin one with
 `yap config set local.model '"small"'`.
 
-### Plays nice with other voice apps
+### Plays nice with other voice apps (context-aware handoff)
 
 yap only holds the mic *while you hold the hotkey*, so it doesn't fight your
 other tools. If you run your own always-listening assistant, point the
@@ -92,8 +92,28 @@ integration hooks at it so it pauses while you dictate and resumes after:
 ```bash
 yap config set integration.on_record_start '"myassistant pause"'
 yap config set integration.on_record_stop  '"myassistant resume"'
-# or poll integration.state_file for {"active": true/false}
 ```
+
+Each hook runs with **context** in its environment, so the handoff can be smart
+about the OS and *which app you're dictating into*:
+
+| var | value |
+|---|---|
+| `YAP_EVENT` | `start` or `stop` |
+| `YAP_OS` | `darwin` / `win32` / `linux` |
+| `YAP_ACTIVE_APP` | the frontmost app (e.g. `Slack`, `Code`, `JARVIS`) |
+
+For example, *don't* pause your assistant when you're dictating **into** it:
+
+```bash
+yap config set integration.on_record_start \
+  '"[ \"$YAP_ACTIVE_APP\" = \"JARVIS\" ] || jarvis pause"'
+yap config set integration.on_record_stop \
+  '"[ \"$YAP_ACTIVE_APP\" = \"JARVIS\" ] || jarvis resume"'
+```
+
+Same context is written to `integration.state_file` as
+`{"active": bool, "os": "...", "active_app": "..."}` if you'd rather poll.
 
 By default yap is **push-to-talk on a single key** (like Wispr's "hold to
 dictate"): **hold Right Option ⌥** on macOS (Right Ctrl elsewhere), speak, and
