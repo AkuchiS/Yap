@@ -129,6 +129,14 @@ def _cmd_icon(args) -> int:
     return 0
 
 
+def _cmd_bundle(args) -> int:
+    from . import bundle
+
+    app = bundle.build(config.load(), args.dest, login=args.login,
+                       menubar_only=args.menubar_only)
+    return 0 if app else 2
+
+
 def _cmd_hardware(_args) -> int:
     from . import hardware
 
@@ -214,6 +222,14 @@ def build_parser() -> argparse.ArgumentParser:
     pi.add_argument("--no-round", action="store_true",
                     help="install the image as-is, without OS-appropriate rounding")
     pi.set_defaults(func=_cmd_icon)
+
+    pb = sub.add_parser("bundle", help="build a macOS .app (double-click, login, own icon)")
+    pb.add_argument("--dest", default="~/Applications",
+                    help="where to write yap.app (default ~/Applications)")
+    pb.add_argument("--login", action="store_true", help="also launch yap at login")
+    pb.add_argument("--menubar-only", action="store_true",
+                    help="hide the Dock icon (menu-bar accessory only)")
+    pb.set_defaults(func=_cmd_bundle)
 
     ph = sub.add_parser("hardware", help="show detected specs + recommended model")
     ph.set_defaults(func=_cmd_hardware)

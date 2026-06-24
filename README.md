@@ -164,9 +164,26 @@ Local model sizes (set `local.model`): `auto` *(default — adapts to your
 machine)*, `tiny.en`, `base.en`, `small`, `medium`, `large-v3`. Bigger = more
 accurate, slower, more RAM.
 
-## Run it on login (optional)
+## Make it a real Mac app
 
-- **macOS / Linux** — add `yap run` to your login items / a user systemd service.
+Turn yap into a proper double-click `yap.app` — Dock icon baked in, its own
+entry in Privacy & Security (so it doesn't borrow Terminal's permissions), and
+optional launch-at-login:
+
+```bash
+yap icon ~/Downloads/yap-icon.png   # (optional) your custom icon, OS-shaped
+yap bundle --login                  # builds ~/Applications/yap.app, starts at login
+open ~/Applications/yap.app
+```
+
+Then grant the **new** "yap" app Microphone + Accessibility + Input Monitoring in
+*System Settings → Privacy & Security*. Because the app is built locally,
+Gatekeeper won't quarantine it. Add `--menubar-only` to hide the Dock icon.
+
+## Run it on login (other platforms)
+
+- **Linux** — `install/yap.service` (a user systemd unit), or add `yap run` to
+  your desktop's autostart.
 - **Windows** — a shortcut to `yap run` in the Startup folder.
 
 See [`install/`](install/) for ready-made helpers.
