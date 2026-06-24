@@ -28,19 +28,31 @@ pip install -U pip wheel >/dev/null
 echo "==> installing yap + build tools (this pulls the Whisper stack)…"
 pip install ".[full]" pyinstaller pillow >/dev/null
 
-# 3. Turn your icon into a multi-resolution .icns.
-ICON_PNG="${1:-$HOME/Library/Application Support/yap/icon.png}"
-if [ -f "$ICON_PNG" ]; then
-  WORK="$(mktemp -d)"; ISET="$WORK/yap.iconset"; mkdir -p "$ISET"
+# 3. Turn your icon into a multi-resolution .icns (shaped to the macOS squircle).
+ICON_SRC="${1:-$HOME/Library/Application Support/yap/icon.png}"
+if [ -f "$ICON_SRC" ]; then
+  WORK="$(mktemp -d)"; ROUNDED="$WORK/rounded.png"
+  # Round to the squircle (transparent corners + inset) so it sits like a native
+  # icon, not a hard square. Pillow is already in the build venv.
+  if ICON_SRC="$ICON_SRC" ROUNDED="$ROUNDED" python - <<'PY'
+import os, sys
+try:
+    from yap.icons import iconify
+    sys.exit(0 if iconify(os.environ["ICON_SRC"], os.environ["ROUNDED"], "darwin") else 1)
+except Exception as e:
+    print("   (icon rounding skipped: %s)" % e); sys.exit(1)
+PY
+  then SRC="$ROUNDED"; else SRC="$ICON_SRC"; fi
+  ISET="$WORK/yap.iconset"; mkdir -p "$ISET"
   for s in 16 32 128 256 512; do
-    sips -z $s $s "$ICON_PNG" --out "$ISET/icon_${s}x${s}.png" >/dev/null
-    sips -z $((s*2)) $((s*2)) "$ICON_PNG" --out "$ISET/icon_${s}x${s}@2x.png" >/dev/null
+    sips -z $s $s "$SRC" --out "$ISET/icon_${s}x${s}.png" >/dev/null
+    sips -z $((s*2)) $((s*2)) "$SRC" --out "$ISET/icon_${s}x${s}@2x.png" >/dev/null
   done
   iconutil -c icns "$ISET" -o "$WORK/yap.icns"
   export YAP_ICNS="$WORK/yap.icns"
-  echo "==> icon: $YAP_ICNS"
+  echo "==> icon: $YAP_ICNS (squircle)"
 else
-  echo "==> no icon at '$ICON_PNG' (run 'yap icon <file>' first); building without one"
+  echo "==> no icon at '$ICON_SRC' (pass one: ./packaging/build_macos.sh path/to/icon.png); building without"
 fi
 
 # 4. Clean up any earlier installs so you don't end up with duplicate menu-bar
