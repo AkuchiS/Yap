@@ -76,25 +76,26 @@ def keytest(cfg: dict[str, Any], seconds: int = 12) -> None:
     seen = {"any": False}
     listener = {"l": None}
 
-    def sig(k):
+    def sigs(k):
+        out = {key_sig(k)}
         try:
-            k = listener["l"].canonical(k)
+            out.add(key_sig(listener["l"].canonical(k)))
         except Exception:
             pass
-        return key_sig(k)
+        return out
 
     def on_press(k):
         seen["any"] = True
-        s = sig(k)
-        pressed.add(s)
-        print(f"  press    {str(k):22} sig={s}")
+        s = sigs(k)
+        pressed.update(s)
+        print(f"  press    {str(k):22} sigs={sorted(s)}")
         if expected.issubset(pressed):
             print("  ✓✓ HOTKEY MATCH — in `vox run`, recording would START here.")
 
     def on_release(k):
-        s = sig(k)
-        print(f"  release  {str(k):22} sig={s}")
-        pressed.discard(s)
+        s = sigs(k)
+        print(f"  release  {str(k):22} sigs={sorted(s)}")
+        pressed.difference_update(s)
 
     print(f"  hotkey = {combo!r}   (expecting sigs: {expected})")
     print(f"  Watching for {seconds}s — press some keys, then HOLD your hotkey…")

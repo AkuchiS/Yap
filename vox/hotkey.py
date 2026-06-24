@@ -72,22 +72,27 @@ class HotkeyListener:
         def satisfied() -> bool:
             return expected.issubset(pressed)
 
-        def sig(key):
+        def sigs(key):
+            # Record BOTH the raw and canonical signatures: pynput may hand the
+            # live key over in either form (e.g. Right Option's raw vk 61 vs the
+            # canonicalized generic-Option vk 58). Matching either avoids the
+            # mismatch that silently breaks modifier hotkeys.
+            out = {key_sig(key)}
             try:
-                key = self._listener.canonical(key)
+                out.add(key_sig(self._listener.canonical(key)))
             except Exception:
                 pass
-            return key_sig(key)
+            return out
 
         def on_press(key):
-            pressed.add(sig(key))
+            pressed.update(sigs(key))
             if satisfied() and not self._active:
                 self._active = True
                 self.on_start()
 
         def on_release(key):
             was = satisfied()
-            pressed.discard(sig(key))
+            pressed.difference_update(sigs(key))
             if was and not satisfied() and self._active:
                 self._active = False
                 self.on_stop()
