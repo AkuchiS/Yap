@@ -32,8 +32,10 @@ dependencies = [
 [project.optional-dependencies]
 # Nicer cross-platform clipboard; native CLIs are used as a fallback otherwise.
 clipboard = ["pyperclip>=1.8"]
+# macOS menu-bar app (`vox app`).
+macos = ["rumps>=0.4.0; sys_platform == 'darwin'"]
 # Everything for the best desktop experience.
-full = ["pyperclip>=1.8"]
+full = ["pyperclip>=1.8", "rumps>=0.4.0; sys_platform == 'darwin'"]
 
 [project.scripts]
 vox = "vox.cli:main"

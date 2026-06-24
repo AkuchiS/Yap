@@ -92,6 +92,22 @@ def _cmd_doctor(args) -> int:
     return doctor.run(config.load(), prompt=args.prompt, seconds=args.seconds)
 
 
+def _cmd_app(_args) -> int:
+    from . import menubar
+
+    return menubar.run(config.load())
+
+
+def _cmd_hardware(_args) -> int:
+    from . import hardware
+
+    print("vox hardware:")
+    print(hardware.summary())
+    print("\nUsing model 'auto' adapts to this. Pin one with: "
+          "vox config set local.model '\"small\"'")
+    return 0
+
+
 def _cmd_config(args) -> int:
     if args.action == "path":
         print(config.config_path())
@@ -158,6 +174,12 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("action", choices=["list", "add", "remove", "fix"])
     pv.add_argument("words", nargs="*", help="word(s); for 'fix': <heard> <wanted>")
     pv.set_defaults(func=_cmd_vocab)
+
+    pa = sub.add_parser("app", help="run the macOS menu-bar app (like Wispr)")
+    pa.set_defaults(func=_cmd_app)
+
+    ph = sub.add_parser("hardware", help="show detected specs + recommended model")
+    ph.set_defaults(func=_cmd_hardware)
 
     pdoc = sub.add_parser("doctor", help="diagnose permissions, hotkey, mic, clipboard")
     pdoc.add_argument("--prompt", action="store_true",

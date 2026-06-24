@@ -70,6 +70,37 @@ def test_multipart_has_boundary_and_file_part():
     assert b"RIFFxxxx" in body
 
 
+def test_hardware_model_tiers():
+    from vox.hardware import recommend_model
+
+    def info(**kw):
+        base = {"ram_gb": 16, "cores": 8, "intel_mac": False,
+                "apple_silicon": False, "cuda": False}
+        base.update(kw)
+        return base
+
+    assert recommend_model(info=info(ram_gb=3, cores=2)) == "tiny.en"
+    assert recommend_model(info=info(ram_gb=8, intel_mac=True)) == "base.en"
+    assert recommend_model(info=info(ram_gb=16)) == "small.en"
+    # multilingual users get the non-.en variant
+    assert recommend_model(prefer_english=False, info=info(ram_gb=16)) == "small"
+
+
+def test_integration_state_file(tmp_path=None):
+    import json
+    import tempfile
+
+    d = tmp_path or tempfile.mkdtemp()
+    sf = os.path.join(str(d), "state.json")
+    from vox.integration import Integration
+
+    ig = Integration({"integration": {"state_file": sf}})
+    ig.record_started()
+    assert json.load(open(sf))["active"] is True
+    ig.record_stopped()
+    assert json.load(open(sf))["active"] is False
+
+
 def test_build_prompt_glossary():
     assert build_prompt([]) is None
     assert build_prompt(None) is None

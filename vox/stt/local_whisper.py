@@ -32,6 +32,16 @@ class LocalWhisperEngine:
         self.prompt = prompt  # vocabulary biasing -> Whisper initial_prompt
         self._model = None  # lazy: don't pay load cost until first use
 
+    def resolved_model(self) -> str:
+        """The model name to load, resolving 'auto' from this machine's specs."""
+        model = self.cfg.get("model", "auto")
+        if model == "auto":
+            from ..hardware import recommend_model
+
+            prefer_en = (self.cfg.get("language") in (None, "", "en"))
+            return recommend_model(prefer_english=prefer_en)
+        return model
+
     def _ensure_model(self):
         if self._model is not None:
             return self._model
@@ -41,8 +51,9 @@ class LocalWhisperEngine:
         compute_type = self.cfg.get("compute_type", "auto")
         if compute_type == "auto":
             compute_type = default_ct
+        self.active_model = self.resolved_model()
         self._model = WhisperModel(
-            self.cfg.get("model", "base.en"),
+            self.active_model,
             device=device,
             compute_type=compute_type,
         )

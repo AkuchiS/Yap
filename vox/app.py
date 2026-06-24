@@ -13,6 +13,7 @@ from . import cleanup
 from .audio import Recorder
 from .hotkey import HotkeyListener, combo_warning, describe_mode
 from .inject import Injector
+from .integration import Integration
 from .stt import build_engine
 from .text import apply_replacements
 
@@ -25,13 +26,24 @@ class App:
         self.engine = build_engine(cfg)
         self.recorder = Recorder(cfg["audio"])
         self.injector = Injector(cfg["inject"])
+        self.integration = Integration(cfg)
         self.samplerate = int(cfg["audio"].get("samplerate", 16000))
         self.verbosity = _LEVELS.get(cfg.get("verbosity", "normal"), 1)
+        # Optional callback for a GUI (menu-bar app) to reflect state:
+        # called with "idle" | "listening" | "transcribing".
+        self.status_cb = None
 
         self._stop_event = threading.Event()
         self._record_thread: Optional[threading.Thread] = None
         self._audio: Optional[np.ndarray] = None
         self._busy = threading.Lock()  # don't start while still transcribing
+
+    def _status(self, state: str) -> None:
+        if self.status_cb:
+            try:
+                self.status_cb(state)
+            except Exception:
+                pass
 
     # ---- hotkey callbacks ---------------------------------------------------
     def on_start(self):
@@ -45,10 +57,13 @@ class App:
 
         self._record_thread = threading.Thread(target=_rec, daemon=True)
         self._record_thread.start()
+        self.integration.record_started()  # tell other voice apps: pause
+        self._status("listening")
         self._log("● listening…", 1)
 
     def on_stop(self):
         self._stop_event.set()
+        self._status("transcribing")
         self._log("◼ processing…", 2)
         # process off the hotkey thread so the listener stays responsive
         threading.Thread(target=self._finish, daemon=True).start()
@@ -90,26 +105,38 @@ class App:
 
                 traceback.print_exc()
         finally:
+            self.integration.record_stopped()  # tell other voice apps: resume
+            self._status("idle")
             self._busy.release()
 
     # ---- lifecycle ----------------------------------------------------------
+    def start_background(self):
+        """Warm up and start the hotkey listener without blocking.
+
+        Returns the listener. Used by GUIs (the menu-bar app) that own the main
+        loop themselves. Call listener.stop() to shut down.
+        """
+        combo = self.cfg["hotkey"]["combo"]
+        mode = self.cfg["hotkey"]["mode"]
+        warn = combo_warning(combo)
+        if warn:
+            self._log(f"vox: warning: {warn}", 0)
+        try:
+            self.engine.warmup()
+        except Exception as e:
+            self._log(f"vox: warmup failed: {e}", 0)
+        self._status("idle")
+        return HotkeyListener(combo, mode, self.on_start, self.on_stop).start()
+
     def run(self):
         combo = self.cfg["hotkey"]["combo"]
         mode = self.cfg["hotkey"]["mode"]
 
         self._log(f"vox {_version()} — engine: {self.engine.name}", 1)
-        warn = combo_warning(combo)
-        if warn:
-            self._log(f"vox: warning: {warn}", 0)
         self._log(describe_mode(mode, combo), 1)
         self._log("Warming up model…", 1)
-        try:
-            self.engine.warmup()
-        except Exception as e:
-            self._log(f"vox: warmup failed: {e}", 0)
+        listener = self.start_background()
         self._log("Ready. (Ctrl+C to quit)\n", 1)
-
-        listener = HotkeyListener(combo, mode, self.on_start, self.on_stop).start()
         try:
             listener.join()
         except KeyboardInterrupt:

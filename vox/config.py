@@ -25,7 +25,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # "cloud"  -> OpenAI-compatible /audio/transcriptions endpoint (BYOK)
     "engine": "local",
     "local": {
-        "model": "base.en",          # tiny.en | base.en | small | medium | large-v3 ...
+        # "auto" picks a model to match your machine (tiny/base on old hardware,
+        # small on modern). Or pin one: tiny.en|base.en|small|medium|large-v3 …
+        "model": "auto",
         "device": "auto",            # auto | cpu | cuda
         "compute_type": "auto",      # auto | int8 | int8_float16 | float16 | float32
         "language": None,            # None = auto-detect; or "en", "es", ...
@@ -87,6 +89,17 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Terminal chatter: "quiet" (errors only), "normal" (listening + result),
     # "debug" (every stage + tracebacks).
     "verbosity": "normal",
+    # Play nice with other voice apps (e.g. your own assistant). vox only opens
+    # the mic *while you hold the key*, so the device is free the rest of the
+    # time. These hooks let you actively pause/resume another listener:
+    #   on_record_start : shell command run the instant dictation begins
+    #   on_record_stop  : shell command run after the text is injected
+    #   state_file      : if set, vox writes {"active": true/false} here to poll
+    "integration": {
+        "on_record_start": "",
+        "on_record_stop": "",
+        "state_file": "",
+    },
 }
 
 

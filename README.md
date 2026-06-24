@@ -63,12 +63,34 @@ pip install vox-dictation        # once published to PyPI
 ## Usage
 
 ```bash
-vox run                       # start the daemon; hold Ctrl+Alt and talk
-vox run --engine local --model small      # bigger local model, more accuracy
+vox run                       # start the daemon; hold your hotkey and talk
+vox app                       # macOS menu-bar app (like Wispr)
 vox transcribe meeting.m4a    # one-shot: transcribe a file, print the text
+vox vocab add JARVIS          # teach it your words (see below)
+vox hardware                  # show your specs + the model it'll auto-pick
+vox doctor                    # diagnose permissions / hotkey / mic / clipboard
 vox devices                   # list microphones
 vox config show               # print effective config
-vox config path               # where the config file lives
+```
+
+### Adapts to your machine
+
+The default model is `"auto"` — vox detects your CPU/RAM/chip and picks a size
+that stays responsive: `tiny.en` on very old/light machines, `base.en` on a
+2019-era laptop, `small.en` on modern hardware, GPU-accelerated if you have
+CUDA. Run `vox hardware` to see the pick, or pin one with
+`vox config set local.model '"small"'`.
+
+### Plays nice with other voice apps
+
+vox only holds the mic *while you hold the hotkey*, so it doesn't fight your
+other tools. If you run your own always-listening assistant, point the
+integration hooks at it so it pauses while you dictate and resumes after:
+
+```bash
+vox config set integration.on_record_start '"myassistant pause"'
+vox config set integration.on_record_stop  '"myassistant resume"'
+# or poll integration.state_file for {"active": true/false}
 ```
 
 By default vox is **push-to-talk on a single key** (like Wispr's "hold to
