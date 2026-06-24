@@ -43,20 +43,28 @@ else
   echo "==> no icon at '$ICON_PNG' (run 'yap icon <file>' first); building without one"
 fi
 
-# 4. Freeze.
+# 4. Clean up any earlier installs so you don't end up with duplicate menu-bar
+#    icons or a stale login agent launching an old copy.
+echo "==> cleaning up previous installs…"
+launchctl unload "$HOME/Library/LaunchAgents/com.yap.dictation.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.yap.dictation.plist"
+pkill -f "Applications/[Yy]ap.app" 2>/dev/null || true
+rm -rf "$HOME/Applications/yap.app" "$HOME/Applications/Yap.app"
+
+# 5. Freeze.
 rm -rf build dist
 echo "==> running PyInstaller…"
 pyinstaller packaging/yap.spec --noconfirm
 
-# 5. Ad-hoc sign so the app's OWN bundled binary is the permission identity.
-codesign --force --deep --sign - dist/yap.app 2>/dev/null || \
+# 6. Ad-hoc sign so the app's OWN bundled binary is the permission identity.
+codesign --force --deep --sign - dist/Yap.app 2>/dev/null || \
   echo "   (codesign skipped — app still runs)"
 
-# 6. Install into ~/Applications.
+# 7. Install into ~/Applications.
 DEST="$HOME/Applications"; mkdir -p "$DEST"
-rm -rf "$DEST/yap.app"; cp -R dist/yap.app "$DEST/"
+rm -rf "$DEST/Yap.app"; cp -R dist/Yap.app "$DEST/"
 deactivate || true
 echo
-echo "✓ built $DEST/yap.app"
-echo "Next: open it, then grant 'yap' Microphone + Accessibility + Input Monitoring"
-echo "in System Settings → Privacy & Security. It now shows as yap, with your icon."
+echo "✓ built $DEST/Yap.app"
+echo "Next: open it, then grant 'Yap' Microphone + Accessibility + Input Monitoring"
+echo "in System Settings → Privacy & Security. It shows as Yap, with your icon."

@@ -83,13 +83,13 @@ coll = COLLECT(exe, a.binaries, a.datas, name="yap")
 if sys.platform == "darwin":
     app = BUNDLE(
         coll,
-        name="yap.app",
+        name="Yap.app",
         icon=os.environ.get("YAP_ICNS") or None,
         bundle_identifier="com.yap.dictation",
         version="0.1.0",
         info_plist={
-            "CFBundleName": "yap",
-            "CFBundleDisplayName": "yap",
+            "CFBundleName": "Yap",
+            "CFBundleDisplayName": "Yap",
             "CFBundleShortVersionString": "0.1.0",
             "CFBundleVersion": "0.1.0",
             "LSMinimumSystemVersion": "11.0",

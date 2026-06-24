@@ -57,7 +57,7 @@ def run(cfg: dict[str, Any]) -> int:
 
     class YapBar(rumps.App):
         def __init__(self):
-            super().__init__("yap", title=_ICONS["idle"], quit_button=None)
+            super().__init__("Yap", title=_ICONS["idle"], quit_button=None)
             _set_dock_icon(config.icon_path(cfg))
             self.status_item = rumps.MenuItem("Starting…")
             mode = cfg["hotkey"]["mode"]
@@ -72,7 +72,7 @@ def run(cfg: dict[str, Any]) -> int:
                 rumps.MenuItem(f"Engine: {logic.engine.name}  ·  switch to {other}",
                                callback=self._toggle_engine),
                 None,
-                rumps.MenuItem("Quit yap", callback=self._quit),
+                rumps.MenuItem("Quit Yap", callback=self._quit),
             ]
             logic.status_cb = self._on_status
             self._listener = None
