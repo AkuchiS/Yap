@@ -114,8 +114,17 @@ def _cmd_icon(args) -> int:
         return 1
     dest = config.config_dir() / "icon.png"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dest)
-    print(f"installed icon → {dest}")
+    from . import icons
+
+    if args.no_round or icons.iconify(str(src), str(dest)) is False:
+        shutil.copyfile(src, dest)
+        if not args.no_round:
+            print("note: install Pillow for OS-appropriate rounding "
+                  "(pipx inject yap-dictation pillow)")
+        print(f"installed icon (as-is) → {dest}")
+    else:
+        shape = "squircle" if sys.platform == "darwin" else "rounded"
+        print(f"installed icon ({shape} for your OS) → {dest}")
     print("relaunch 'yap app' to see it in the Dock.")
     return 0
 
@@ -202,6 +211,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     pi = sub.add_parser("icon", help="set a custom Dock icon for the app")
     pi.add_argument("path", nargs="?", help="image file (PNG/ICNS); omit to show current")
+    pi.add_argument("--no-round", action="store_true",
+                    help="install the image as-is, without OS-appropriate rounding")
     pi.set_defaults(func=_cmd_icon)
 
     ph = sub.add_parser("hardware", help="show detected specs + recommended model")
