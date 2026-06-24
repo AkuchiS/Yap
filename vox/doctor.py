@@ -64,9 +64,11 @@ def keytest(cfg: dict[str, Any], seconds: int = 12) -> None:
         print(f"  ✗ pynput unavailable ({e}); install it: pip install pynput")
         return
 
+    from .hotkey import key_sig, parse_combo_sigs
+
     combo = cfg["hotkey"]["combo"]
     try:
-        expected = set(keyboard.HotKey.parse(combo))
+        expected = parse_combo_sigs(combo)
     except Exception as e:
         print(f"  could not parse hotkey {combo!r}: {e}")
         return
@@ -74,26 +76,27 @@ def keytest(cfg: dict[str, Any], seconds: int = 12) -> None:
     seen = {"any": False}
     listener = {"l": None}
 
-    def canon(k):
+    def sig(k):
         try:
-            return listener["l"].canonical(k)
+            k = listener["l"].canonical(k)
         except Exception:
-            return k
+            pass
+        return key_sig(k)
 
     def on_press(k):
         seen["any"] = True
-        c = canon(k)
-        pressed.add(c)
-        print(f"  press    {str(k):22} canonical={c}")
+        s = sig(k)
+        pressed.add(s)
+        print(f"  press    {str(k):22} sig={s}")
         if expected.issubset(pressed):
             print("  ✓✓ HOTKEY MATCH — in `vox run`, recording would START here.")
 
     def on_release(k):
-        c = canon(k)
-        print(f"  release  {str(k):22} canonical={c}")
-        pressed.discard(c)
+        s = sig(k)
+        print(f"  release  {str(k):22} sig={s}")
+        pressed.discard(s)
 
-    print(f"  hotkey = {combo!r}   (expecting keys: {expected})")
+    print(f"  hotkey = {combo!r}   (expecting sigs: {expected})")
     print(f"  Watching for {seconds}s — press some keys, then HOLD your hotkey…")
     listener["l"] = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener["l"].start()

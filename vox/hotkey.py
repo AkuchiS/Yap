@@ -12,6 +12,31 @@ import sys
 from typing import Callable
 
 
+def key_sig(key):
+    """Normalize a pynput Key/KeyCode to a comparable signature.
+
+    pynput parses "<alt_r>" into a KeyCode (vk 61 on macOS) but reports the
+    live keypress as the named Key.alt_r — the same physical key, two different
+    objects. Reducing both to ('vk', N) (or a char) lets them compare equal.
+    """
+    from pynput.keyboard import Key, KeyCode
+
+    k = key.value if isinstance(key, Key) else key
+    if isinstance(k, KeyCode):
+        if k.vk is not None:
+            return ("vk", k.vk)
+        if k.char:
+            return ("char", k.char.lower())
+    return ("name", str(k))
+
+
+def parse_combo_sigs(combo: str) -> set:
+    """The set of key signatures that must all be held for `combo` to fire."""
+    from pynput import keyboard
+
+    return {key_sig(k) for k in keyboard.HotKey.parse(combo)}
+
+
 class HotkeyListener:
     def __init__(self, combo: str, mode: str, on_start: Callable[[], None],
                  on_stop: Callable[[], None]):
@@ -41,21 +66,28 @@ class HotkeyListener:
     def _start_hold(self):
         from pynput import keyboard
 
-        expected = set(keyboard.HotKey.parse(self.combo))
+        expected = parse_combo_sigs(self.combo)
         pressed: set = set()
 
         def satisfied() -> bool:
             return expected.issubset(pressed)
 
+        def sig(key):
+            try:
+                key = self._listener.canonical(key)
+            except Exception:
+                pass
+            return key_sig(key)
+
         def on_press(key):
-            pressed.add(self._listener.canonical(key))
+            pressed.add(sig(key))
             if satisfied() and not self._active:
                 self._active = True
                 self.on_start()
 
         def on_release(key):
             was = satisfied()
-            pressed.discard(self._listener.canonical(key))
+            pressed.discard(sig(key))
             if was and not satisfied() and self._active:
                 self._active = False
                 self.on_stop()
