@@ -27,8 +27,9 @@ def _resolve_device(device: str) -> tuple[str, str]:
 class LocalWhisperEngine:
     name = "local"
 
-    def __init__(self, cfg: dict[str, Any]):
+    def __init__(self, cfg: dict[str, Any], prompt: Optional[str] = None):
         self.cfg = cfg
+        self.prompt = prompt  # vocabulary biasing -> Whisper initial_prompt
         self._model = None  # lazy: don't pay load cost until first use
 
     def _ensure_model(self):
@@ -58,6 +59,7 @@ class LocalWhisperEngine:
             language=language,
             beam_size=int(self.cfg.get("beam_size", 1)),
             vad_filter=True,  # trim leading/trailing silence -> faster, cleaner
+            initial_prompt=self.prompt,  # bias toward the user's vocabulary
         )
         return "".join(seg.text for seg in segments).strip()
 

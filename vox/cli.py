@@ -16,6 +16,10 @@ def _cmd_run(args) -> int:
         cfg["engine"] = args.engine
     if args.model:
         cfg["local"]["model"] = args.model
+    if args.quiet:
+        cfg["verbosity"] = "quiet"
+    if args.debug:
+        cfg["verbosity"] = "debug"
     from .app import App
 
     App(cfg).run()
@@ -34,10 +38,45 @@ def _cmd_transcribe(args) -> int:
     engine = build_engine(cfg)
     text = engine.transcribe_file(args.file)
     from . import cleanup
+    from .text import apply_replacements
 
     text = cleanup.maybe_clean(text, cfg)
+    text = apply_replacements(text, cfg.get("replacements"))
     print(text)
     return 0
+
+
+def _cmd_vocab(args) -> int:
+    cfg = config.load()
+    vocab = cfg.setdefault("vocabulary", [])
+    repl = cfg.setdefault("replacements", {})
+    if args.action == "list":
+        print("vocabulary:", ", ".join(vocab) if vocab else "(empty)")
+        if repl:
+            print("replacements:")
+            for k, v in repl.items():
+                print(f"  {k!r} -> {v!r}")
+        return 0
+    if args.action == "add":
+        added = [w for w in args.words if w not in vocab]
+        vocab.extend(added)
+        config.save(cfg)
+        print(f"added {added or '(nothing new)'}; vocabulary now {len(vocab)} words")
+        return 0
+    if args.action == "remove":
+        cfg["vocabulary"] = [w for w in vocab if w not in args.words]
+        config.save(cfg)
+        print(f"vocabulary now {len(cfg['vocabulary'])} words")
+        return 0
+    if args.action == "fix":
+        if len(args.words) != 2:
+            print("usage: vox vocab fix <heard> <wanted>", file=sys.stderr)
+            return 2
+        repl[args.words[0]] = args.words[1]
+        config.save(cfg)
+        print(f"added replacement {args.words[0]!r} -> {args.words[1]!r}")
+        return 0
+    return 2
 
 
 def _cmd_devices(_args) -> int:
@@ -102,6 +141,8 @@ def build_parser() -> argparse.ArgumentParser:
     pr = sub.add_parser("run", help="start the dictation daemon (hotkey -> text)")
     pr.add_argument("--engine", choices=["local", "cloud"], help="override engine")
     pr.add_argument("--model", help="override local model (e.g. small, large-v3)")
+    pr.add_argument("--quiet", action="store_true", help="errors only, no chatter")
+    pr.add_argument("--debug", action="store_true", help="verbose per-stage logging")
     pr.set_defaults(func=_cmd_run)
 
     pt = sub.add_parser("transcribe", help="transcribe an audio file and print the text")
@@ -112,6 +153,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     pd = sub.add_parser("devices", help="list microphone input devices")
     pd.set_defaults(func=_cmd_devices)
+
+    pv = sub.add_parser("vocab", help="teach vox your words (names, jargon, fixes)")
+    pv.add_argument("action", choices=["list", "add", "remove", "fix"])
+    pv.add_argument("words", nargs="*", help="word(s); for 'fix': <heard> <wanted>")
+    pv.set_defaults(func=_cmd_vocab)
 
     pdoc = sub.add_parser("doctor", help="diagnose permissions, hotkey, mic, clipboard")
     pdoc.add_argument("--prompt", action="store_true",

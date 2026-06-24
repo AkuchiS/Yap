@@ -90,6 +90,26 @@ vox config set hotkey.mode  '"toggle"'     # press to start, press to stop
 > cross-platform input library can't see it. Right Option gives you the same
 > one-key feel and works reliably. (A native Fn backend is on the roadmap.)
 
+## Teach it your words
+
+Like Wispr, vox can learn the names and jargon you use so they come out right
+instead of being guessed at ("JARVIS", not "Java" or "Jarvis"):
+
+```bash
+vox vocab add JARVIS Anthropic Kubernetes     # bias recognition toward these
+vox vocab fix "jarvis" "JARVIS"               # always rewrite a misheard word
+vox vocab list
+```
+
+`vocab add` feeds Whisper a glossary hint (helps it *spell* unfamiliar words);
+`vocab fix` is a guaranteed find/replace for words it *consistently* mangles.
+
+## Quiet vs. verbose
+
+By default vox prints just `● listening…` and the final `✓ "transcript"`.
+Want silence (e.g. running it as a background app)? `vox run --quiet`.
+Debugging? `vox run --debug` narrates every stage.
+
 ## Configuration
 
 Config is a JSON file (`vox config path` to find it). Secrets are **never**

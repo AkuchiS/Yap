@@ -78,8 +78,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "device": None,              # input device index or name substring; None = default
         "max_seconds": 120,          # hard cap so a stuck recording can't run forever
     },
-    # Print transcripts to stdout as they happen (handy for debugging / logging).
-    "echo": True,
+    # Words/names to bias recognition toward, so jargon and proper nouns come
+    # out right (e.g. "JARVIS", "Anthropic"). Fed to Whisper as a hint prompt.
+    "vocabulary": [],
+    # Deterministic fix-ups applied after transcription, {heard: wanted}. Useful
+    # when a word is *consistently* misheard, e.g. {"jarvis": "JARVIS"}.
+    "replacements": {},
+    # Terminal chatter: "quiet" (errors only), "normal" (listening + result),
+    # "debug" (every stage + tracebacks).
+    "verbosity": "normal",
 }
 
 

@@ -60,8 +60,9 @@ def _multipart(fields: dict[str, str], filename: str, file_bytes: bytes) -> tupl
 class CloudWhisperEngine:
     name = "cloud"
 
-    def __init__(self, cfg: dict[str, Any]):
+    def __init__(self, cfg: dict[str, Any], prompt: Optional[str] = None):
         self.cfg = cfg
+        self.prompt = prompt  # vocabulary biasing -> transcription "prompt" field
         self.base_url = cfg.get("base_url", "https://api.groq.com/openai/v1").rstrip("/")
         self.model = cfg.get("model", "whisper-large-v3-turbo")
         self.api_key = os.environ.get(cfg.get("api_key_env", "VOX_API_KEY") or "")
@@ -84,6 +85,8 @@ class CloudWhisperEngine:
         language: Optional[str] = self.cfg.get("language")
         if language:
             fields["language"] = language
+        if self.prompt:
+            fields["prompt"] = self.prompt
         body, content_type = _multipart(fields, "audio.wav", wav_bytes)
         req = urllib.request.Request(
             f"{self.base_url}/audio/transcriptions",

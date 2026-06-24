@@ -14,6 +14,9 @@ from .audio import Recorder
 from .hotkey import HotkeyListener, combo_warning, describe_mode
 from .inject import Injector
 from .stt import build_engine
+from .text import apply_replacements
+
+_LEVELS = {"quiet": 0, "normal": 1, "debug": 2}
 
 
 class App:
@@ -23,7 +26,7 @@ class App:
         self.recorder = Recorder(cfg["audio"])
         self.injector = Injector(cfg["inject"])
         self.samplerate = int(cfg["audio"].get("samplerate", 16000))
-        self.echo = bool(cfg.get("echo", True))
+        self.verbosity = _LEVELS.get(cfg.get("verbosity", "normal"), 1)
 
         self._stop_event = threading.Event()
         self._record_thread: Optional[threading.Thread] = None
@@ -42,17 +45,18 @@ class App:
 
         self._record_thread = threading.Thread(target=_rec, daemon=True)
         self._record_thread.start()
-        self._log("● recording… (speak now, release to transcribe)")
+        self._log("● listening…", 1)
 
     def on_stop(self):
         self._stop_event.set()
-        self._log("◼ stopped — processing…")
+        self._log("◼ processing…", 2)
         # process off the hotkey thread so the listener stays responsive
         threading.Thread(target=self._finish, daemon=True).start()
 
-    def _log(self, msg: str) -> None:
-        # flush so stage markers appear immediately, even through a pipe
-        print(msg, file=sys.stderr, flush=True)
+    def _log(self, msg: str, level: int = 1) -> None:
+        # flush so messages appear immediately, even through a pipe
+        if self.verbosity >= level:
+            print(msg, file=sys.stderr, flush=True)
 
     def _finish(self):
         try:
@@ -60,29 +64,31 @@ class App:
                 self._record_thread.join()
             audio = self._audio
             if audio is None:
-                self._log("… no audio captured (mic blocked or device busy?)")
+                self._log("… no audio captured (mic blocked or device busy?)", 1)
                 return
             secs = audio.shape[0] / self.samplerate
             if audio.shape[0] < self.samplerate * 0.2:
-                self._log(f"… too short ({secs:.2f}s), ignored")
+                self._log(f"… too short ({secs:.2f}s), ignored", 2)
                 return
-            self._log(f"… transcribing {secs:.1f}s of audio…")
+            self._log(f"… transcribing {secs:.1f}s…", 2)
             t0 = time.time()
             text = self.engine.transcribe_array(audio, self.samplerate)
             text = cleanup.maybe_clean(text, self.cfg)
+            text = apply_replacements(text, self.cfg.get("replacements"))
             dt = time.time() - t0
             if not text:
-                self._log(f"… no speech detected ({dt:.1f}s stt) — try speaking louder/closer")
+                self._log("… no speech detected — try speaking louder/closer", 1)
                 return
-            self._log(f'✓ [{secs:.1f}s audio, {dt:.1f}s stt] "{text}"')
-            self._log("… injecting text at cursor…")
+            self._log(f'✓ "{text}"', 1)
+            self._log(f"  ({secs:.1f}s audio, {dt:.1f}s transcribe)", 2)
             self.injector.inject(text)
-            self._log("✓ done")
+            self._log("… injected at cursor", 2)
         except Exception as e:
-            import traceback
+            self._log(f"vox: error during transcription: {e}", 0)
+            if self.verbosity >= _LEVELS["debug"]:
+                import traceback
 
-            self._log(f"vox: error during transcription: {e}")
-            traceback.print_exc()
+                traceback.print_exc()
         finally:
             self._busy.release()
 
@@ -91,23 +97,23 @@ class App:
         combo = self.cfg["hotkey"]["combo"]
         mode = self.cfg["hotkey"]["mode"]
 
-        print(f"vox {_version()} — engine: {self.engine.name}", file=sys.stderr)
+        self._log(f"vox {_version()} — engine: {self.engine.name}", 1)
         warn = combo_warning(combo)
         if warn:
-            print(f"vox: warning: {warn}", file=sys.stderr)
-        print(describe_mode(mode, combo), file=sys.stderr)
-        print("Warming up model…", file=sys.stderr)
+            self._log(f"vox: warning: {warn}", 0)
+        self._log(describe_mode(mode, combo), 1)
+        self._log("Warming up model…", 1)
         try:
             self.engine.warmup()
         except Exception as e:
-            print(f"vox: warmup failed: {e}", file=sys.stderr)
-        print("Ready. (Ctrl+C to quit)\n", file=sys.stderr)
+            self._log(f"vox: warmup failed: {e}", 0)
+        self._log("Ready. (Ctrl+C to quit)\n", 1)
 
         listener = HotkeyListener(combo, mode, self.on_start, self.on_stop).start()
         try:
             listener.join()
         except KeyboardInterrupt:
-            print("\nvox: bye.", file=sys.stderr)
+            self._log("\nvox: bye.", 1)
         finally:
             listener.stop()
 

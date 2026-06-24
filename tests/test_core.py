@@ -16,6 +16,7 @@ from vox import config
 from vox.cli import _parse_value, _set_dotted
 from vox.stt.cloud_openai import _array_to_wav_bytes, _multipart
 from vox.stt.local_whisper import _resample_to_16k
+from vox.text import apply_replacements, build_prompt
 
 
 def test_config_deep_merge_preserves_defaults():
@@ -67,6 +68,25 @@ def test_multipart_has_boundary_and_file_part():
     assert b'name="file"; filename="audio.wav"' in body
     assert b'name="model"' in body
     assert b"RIFFxxxx" in body
+
+
+def test_build_prompt_glossary():
+    assert build_prompt([]) is None
+    assert build_prompt(None) is None
+    assert build_prompt(["JARVIS", "Anthropic"]) == "Glossary: JARVIS, Anthropic."
+
+
+def test_apply_replacements_whole_word_case_insensitive():
+    assert apply_replacements("i love jarvis and Jarvis", {"jarvis": "JARVIS"}) == \
+        "i love JARVIS and JARVIS"
+    # multi-word keys work
+    assert apply_replacements("write java script", {"java script": "JavaScript"}) == \
+        "write JavaScript"
+    # doesn't clobber substrings inside other words
+    assert apply_replacements("jarvisson", {"jarvis": "JARVIS"}) == "jarvisson"
+    # empty inputs are safe
+    assert apply_replacements("", {"a": "b"}) == ""
+    assert apply_replacements("x", {}) == "x"
 
 
 if __name__ == "__main__":
