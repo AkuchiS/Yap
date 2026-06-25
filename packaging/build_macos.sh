@@ -32,17 +32,27 @@ pip install ".[full]" pyinstaller pillow pyobjc-framework-ApplicationServices >/
 #    Default to the icon committed in the repo so builds are self-contained;
 #    fall back to ~/Downloads or the config dir; or pass a path as arg 1.
 ICON_SRC="${1:-}"
+PRESHAPED=""
 if [ -z "$ICON_SRC" ]; then
-  for c in "$ROOT/packaging/yap-icon.png" "$HOME/Downloads/yap-icon.png" \
-           "$HOME/Library/Application Support/yap/icon.png"; do
-    [ -f "$c" ] && { ICON_SRC="$c"; break; }
-  done
+  # Prefer the pre-rounded, transparent-corner icon committed in the repo: it's
+  # already the macOS squircle, so the result is correct even if Pillow/iconify
+  # isn't usable in the build env (which is what shipped a square icon before).
+  if [ -f "$ROOT/packaging/yap-icon-macos.png" ]; then
+    ICON_SRC="$ROOT/packaging/yap-icon-macos.png"; PRESHAPED=1
+  else
+    for c in "$ROOT/packaging/yap-icon.png" "$HOME/Downloads/yap-icon.png" \
+             "$HOME/Library/Application Support/yap/icon.png"; do
+      [ -f "$c" ] && { ICON_SRC="$c"; break; }
+    done
+  fi
 fi
 if [ -f "$ICON_SRC" ]; then
   WORK="$(mktemp -d)"; ROUNDED="$WORK/rounded.png"
-  # Round to the squircle (transparent corners + inset) so it sits like a native
-  # icon, not a hard square. Pillow is already in the build venv.
-  if ICON_SRC="$ICON_SRC" ROUNDED="$ROUNDED" python - <<'PY'
+  if [ -n "$PRESHAPED" ]; then
+    SRC="$ICON_SRC"   # already a transparent squircle — use as-is (sips keeps alpha)
+  # Otherwise round to the squircle (transparent corners + inset) so it sits like
+  # a native icon, not a hard square. Needs Pillow in the build venv.
+  elif ICON_SRC="$ICON_SRC" ROUNDED="$ROUNDED" python - <<'PY'
 import os, sys
 try:
     from yap.icons import iconify
