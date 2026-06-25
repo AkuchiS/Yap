@@ -78,6 +78,7 @@ yap hardware                  # show your specs + the model it'll auto-pick
 yap doctor                    # diagnose permissions / hotkey / mic / clipboard
 yap devices                   # list microphones
 yap config show               # print effective config
+yap license                   # show your install date + early-adopter code
 ```
 
 ### Adapts to your machine
@@ -273,6 +274,14 @@ network and it still works. It records audio only while you hold/toggle the
 hotkey, keeps nothing on disk, and phones no one home. Cloud engines and the
 optional cleanup pass are strictly opt-in and only ever talk to the endpoint
 *you* configure.
+
+## Early adopters
+
+yap stamps the date of its first run on your machine — a tiny local
+`install.json`, kept on-device and never uploaded. There's no paywall today. But
+if a paid tier ever appears, everyone who installed *before* that day keeps the
+free version: run `yap license` to see your install date and a portable code that
+proves it.
 
 ## Support
 

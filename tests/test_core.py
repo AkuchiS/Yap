@@ -152,6 +152,45 @@ def test_apply_replacements_whole_word_case_insensitive():
     assert apply_replacements("x", {}) == "x"
 
 
+def test_license_install_record_is_stable():
+    import tempfile
+
+    os.environ["YAP_CONFIG_DIR"] = tempfile.mkdtemp()
+    try:
+        from yap import licensing
+
+        first = licensing.install_record()
+        assert first["installed_at"] and first["id"]
+        # second call must return the SAME record (date never re-stamped)
+        second = licensing.install_record()
+        assert second == first
+    finally:
+        os.environ.pop("YAP_CONFIG_DIR", None)
+
+
+def test_license_grandfather_code_roundtrip_and_cutoff():
+    import tempfile
+
+    os.environ["YAP_CONFIG_DIR"] = tempfile.mkdtemp()
+    try:
+        from yap import licensing
+
+        rec = licensing.install_record()
+        # signed code verifies; a tampered one does not
+        code = licensing.grandfather_code(rec, secret="s3cret")
+        assert licensing.verify_code(code, "s3cret")["valid"] is True
+        assert licensing.verify_code(code, "wrong")["valid"] is False
+        assert licensing.verify_code(code + "x", "s3cret")["valid"] is False
+        # unsigned when no secret
+        assert licensing.grandfather_code(rec).endswith(".unsigned")
+        # cutoff logic: installed today → not grandfathered against a past cutoff,
+        # but grandfathered against a far-future one
+        assert licensing.is_grandfathered("2000-01-01", rec) is False
+        assert licensing.is_grandfathered("2999-01-01", rec) is True
+    finally:
+        os.environ.pop("YAP_CONFIG_DIR", None)
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

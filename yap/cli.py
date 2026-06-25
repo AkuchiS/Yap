@@ -104,6 +104,21 @@ def _cmd_devices(_args) -> int:
     return 0
 
 
+def _cmd_license(args) -> int:
+    from . import licensing
+
+    if args.verify:
+        secret = os.environ.get(licensing.SECRET_ENV, "")
+        if not secret:
+            print(f"yap: set {licensing.SECRET_ENV} to verify a code", file=sys.stderr)
+            return 2
+        res = licensing.verify_code(args.verify, secret)
+        print(json.dumps(res, indent=2))
+        return 0 if res["valid"] else 1
+    print(licensing.summary())
+    return 0
+
+
 def _bundled_sample() -> str:
     """Path to the built-in self-test clip (works frozen via _MEIPASS or in-repo)."""
     base = getattr(sys, "_MEIPASS", None)
@@ -273,6 +288,11 @@ def build_parser() -> argparse.ArgumentParser:
     pd = sub.add_parser("devices", help="list microphone input devices")
     pd.set_defaults(func=_cmd_devices)
 
+    pl = sub.add_parser("license", help="show install date + early-adopter code")
+    pl.add_argument("--verify", metavar="CODE",
+                    help=f"verify a grandfather code (needs {'YAP_LICENSE_SECRET'})")
+    pl.set_defaults(func=_cmd_license)
+
     ps = sub.add_parser("selftest", help="verify the STT engine on a known clip")
     ps.add_argument("--file", help="a 16-bit PCM wav to test (default: built-in clip)")
     ps.add_argument("--engine", choices=["local", "cloud"], help="override engine")
@@ -323,6 +343,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    from . import licensing
+
+    licensing.stamp_install()  # records first-run date once (local, no telemetry)
     try:
         return args.func(args)
     except KeyboardInterrupt:
