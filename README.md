@@ -89,6 +89,28 @@ that stays responsive: `tiny.en` on very old/light machines, `base.en` on a
 CUDA. Run `yap hardware` to see the pick, or pin one with
 `yap config set local.model '"small"'`.
 
+### Picking a microphone (docks & external displays)
+
+By default yap uses your **system default** mic. The catch: plug in an external
+display (or dock) with its own mic and macOS often *switches the default* to it —
+so yap suddenly records from a mic across the room. Pin the one you want:
+
+```bash
+yap devices                                              # see every mic + which yap will use
+yap config set audio.device '"MacBook Pro Microphone"'  # pin by name (substring, case-insensitive)
+```
+
+Dock and undock a lot? Give it an **ordered fallback list** instead of a single
+name — yap re-checks on every keypress and takes the first one that's actually
+present, so closing the lid (built-in mic gone) cleanly falls through to the
+display mic:
+
+```bash
+yap config set audio.device '["MacBook Pro Microphone", "Studio Display"]'
+```
+
+`yap devices` prints `yap will use: …` for your current setup so you can confirm.
+
 ### Plays nice with other voice apps (context-aware handoff)
 
 yap only holds the mic *while you hold the hotkey*, so it doesn't fight your
@@ -288,8 +310,10 @@ proves it.
 yap is free and open source — built by a retired veteran, in his spare time,
 because dictation shouldn't be locked behind a subscription. If it saves you
 time, a small donation helps cover real costs (like Apple's $99/yr signing fee
-for warning-free Mac builds) and keeps it moving. Totally optional — yap is, and
-always will be, free.
+for warning-free Mac builds) and keeps it moving. Totally optional. yap is free
+today — and **early adopters stay free for good**: if a paid tier ever arrives,
+everyone who installed before it keeps the free version (see
+[Early adopters](#early-adopters)).
 
 ❤️ [**Sponsor on GitHub**](https://github.com/sponsors/AkuchiS)
 
