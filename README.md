@@ -53,8 +53,8 @@ yap run
 nothing pollutes your system Python. Then hold **Right Option**, speak, release —
 your words land at the cursor.
 
-> Once this repo is public, the whole thing collapses to one line:
-> `pipx install git+https://github.com/AkuchiS/yap`
+> Prefer a one-liner? `pipx install git+https://github.com/AkuchiS/yap`
+> does the same thing.
 
 ### Per-OS extras
 
