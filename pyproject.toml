@@ -8,7 +8,7 @@ version = "0.1.1"
 description = "Free, offline-first, cross-platform voice dictation — speak anywhere, get text at your cursor."
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.14"
 authors = [{ name = "yap contributors" }]
 keywords = ["dictation", "speech-to-text", "whisper", "voice", "accessibility", "wispr"]
 classifiers = [

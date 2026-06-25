@@ -41,8 +41,8 @@ What you get:
 
 ## Install
 
-Requires **Python 3.9+**. The local engine downloads a small Whisper model on
-first use. Clone, run the installer, go:
+Requires **Python 3.9–3.13** (3.14 is too new — some native deps don't have
+wheels for it yet). The local engine downloads a small Whisper model on first use. Clone, run the installer, go:
 
 ```bash
 git clone https://github.com/AkuchiS/yap.git
