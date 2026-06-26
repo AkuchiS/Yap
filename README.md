@@ -1,5 +1,6 @@
 # yap — free voice dictation, everywhere
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-8A2BE2)](https://github.com/sponsors/AkuchiS)
 [![Release](https://img.shields.io/github/v/release/AkuchiS/yap?color=8A2BE2)](https://github.com/AkuchiS/yap/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/AkuchiS/yap/total?color=8A2BE2)](https://github.com/AkuchiS/yap/releases)
 [![License: MIT](https://img.shields.io/github/license/AkuchiS/yap?color=8A2BE2)](LICENSE)
