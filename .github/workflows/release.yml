@@ -43,7 +43,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: sudo apt-get update && sudo apt-get install -y libportaudio2
+      - name: Install PortAudio (retry on flaky apt mirrors)
+        run: |
+          for i in 1 2 3; do
+            sudo apt-get update && sudo apt-get install -y libportaudio2 && break
+            echo "apt attempt $i failed; retrying in 10s…"; sleep 10
+          done
       - name: Build
         run: |
           chmod +x packaging/build_linux.sh
