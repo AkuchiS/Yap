@@ -104,6 +104,23 @@ def _cmd_devices(_args) -> int:
     return 0
 
 
+def _cmd_update(args) -> int:
+    from . import update as _update
+
+    info = _update.check_for_update(force=True)
+    if info is None:
+        print("yap: couldn't check for updates (offline?).", file=sys.stderr)
+        return 1
+    if not info["available"]:
+        print(f"yap {info['current']} is up to date.")
+        return 0
+    print(_update.instructions(info))
+    if args.apply:
+        print("opening the download page…" if _update.apply(info)
+              else "yap: couldn't open a browser; visit the link above.")
+    return 0
+
+
 def _cmd_license(args) -> int:
     from . import licensing
 
@@ -292,6 +309,11 @@ def build_parser() -> argparse.ArgumentParser:
     pl.add_argument("--verify", metavar="CODE",
                     help=f"verify a grandfather code (needs {'YAP_LICENSE_SECRET'})")
     pl.set_defaults(func=_cmd_license)
+
+    pup = sub.add_parser("update", help="check for a newer yap release")
+    pup.add_argument("--apply", action="store_true",
+                     help="open the download page for the new version")
+    pup.set_defaults(func=_cmd_update)
 
     ps = sub.add_parser("selftest", help="verify the STT engine on a known clip")
     ps.add_argument("--file", help="a 16-bit PCM wav to test (default: built-in clip)")

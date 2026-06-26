@@ -191,6 +191,42 @@ def test_license_grandfather_code_roundtrip_and_cutoff():
         os.environ.pop("YAP_CONFIG_DIR", None)
 
 
+def test_update_version_compare():
+    from yap.update import _parse_version, _is_newer
+
+    assert _parse_version("v0.1.2") == (0, 1, 2)
+    assert _parse_version("0.1.10") == (0, 1, 10)
+    assert _is_newer("0.1.2", "0.1.1")
+    assert _is_newer("0.2.0", "0.1.9")
+    assert not _is_newer("0.1.1", "0.1.1")
+    assert not _is_newer("0.1.0", "0.1.1")
+
+
+def test_update_check_with_stubbed_fetcher():
+    import tempfile
+
+    os.environ["YAP_CONFIG_DIR"] = tempfile.mkdtemp()
+    try:
+        from yap import update
+
+        newer = update.check_for_update(
+            current="0.1.2", force=True,
+            fetcher=lambda: {"tag_name": "v0.2.0", "html_url": "http://x/rel"})
+        assert newer["available"] is True and newer["latest"] == "0.2.0"
+        assert newer["url"] == "http://x/rel"
+
+        same = update.check_for_update(
+            current="0.1.2", force=True,
+            fetcher=lambda: {"tag_name": "v0.1.2", "html_url": "http://x"})
+        assert same["available"] is False
+
+        # offline / failed fetch -> None (caller treats as "unknown")
+        assert update.check_for_update(current="0.1.2", force=True,
+                                       fetcher=lambda: None) is None
+    finally:
+        os.environ.pop("YAP_CONFIG_DIR", None)
+
+
 def test_audio_resample_rate_conversion():
     from yap.audio import _resample
 

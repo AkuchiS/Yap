@@ -84,6 +84,7 @@ yap doctor                    # diagnose permissions / hotkey / mic / clipboard
 yap devices                   # list microphones
 yap config show               # print effective config
 yap license                   # show your install date + early-adopter code
+yap update                    # check GitHub for a newer release
 ```
 
 ### Adapts to your machine

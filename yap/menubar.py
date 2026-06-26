@@ -132,9 +132,54 @@ def run(cfg: dict[str, Any]) -> int:
             # start the engine off the main thread so the menu appears instantly
             threading.Thread(target=self._boot, daemon=True).start()
 
+            # check for a newer release in the background (cached ~daily) and, if
+            # there is one, surface it as a menu item via a main-loop timer.
+            self._pending_update = None
+            self._update_added = False
+            self._update_ticks = 0
+            threading.Thread(target=self._check_update, daemon=True).start()
+            try:
+                self._update_timer = rumps.Timer(self._surface_update, 3)
+                self._update_timer.start()
+            except Exception:
+                pass
+
         def _boot(self):
             self._listener = logic.start_background()
             self.status_item.title = "Ready — hold your hotkey to dictate"
+
+        def _check_update(self):
+            try:
+                from . import update as _update
+                info = _update.check_for_update()
+                if info and info.get("available"):
+                    self._pending_update = info
+            except Exception:
+                pass
+
+        def _surface_update(self, timer):
+            # runs on the rumps main loop; safe to touch the menu here
+            info = self._pending_update
+            if info and not self._update_added:
+                try:
+                    import webbrowser
+                    url = info["url"]
+                    item = rumps.MenuItem(
+                        f"⬆︎  Update available: v{info['latest']}",
+                        callback=lambda _s, u=url: webbrowser.open(u))
+                    try:
+                        self.menu.insert_before("Quit Yap", item)
+                    except Exception:
+                        self.menu.add(item)
+                    self._update_added = True
+                except Exception:
+                    pass
+            self._update_ticks += 1
+            if self._update_added or self._update_ticks > 10:  # surfaced, or give up after ~30s
+                try:
+                    timer.stop()
+                except Exception:
+                    pass
 
         def _on_status(self, state: str):
             # called from worker threads; rumps title set is thread-safe enough here
