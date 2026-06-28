@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yap — free, offline voice dictation for Mac, Windows & Linux</title>
+<meta name="description" content="Free, open-source voice dictation. Hold a key, talk, and your words appear at the cursor in any app. Local Whisper by default — offline, private, no subscription. A Wispr Flow alternative. macOS, Windows, Linux. MIT.">
+<meta property="og:title" content="yap — free, offline voice dictation">
+<meta property="og:description" content="Hold a key, talk, and your words appear at the cursor in any app. Local Whisper, offline, no subscription. A free Wispr Flow alternative.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://akuchis.github.io/yap/">
+<link rel="icon" href="yap-icon.png">
+<style>
+  :root{--bg:#0b0710;--card:#161020;--tx:#ece8f3;--mut:#a99fbd;--cy:#8a2be2;--glow:0 0 18px rgba(138,43,226,.55)}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#1c1230,#0b0710);color:var(--tx);
+       font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:#c79bff;text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:860px;margin:0 auto;padding:0 22px}
+  header{text-align:center;padding:64px 0 28px}
+  header img{width:112px;height:112px;border-radius:24px;box-shadow:var(--glow)}
+  h1{font-size:40px;margin:18px 0 6px;letter-spacing:.5px}
+  h1 b{color:var(--cy);text-shadow:var(--glow)}
+  .tag{font-size:19px;color:var(--mut);max-width:620px;margin:0 auto 26px}
+  .btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;padding:12px 22px;border-radius:11px;font-weight:600;border:1px solid #3a2a55}
+  .btn.primary{background:linear-gradient(180deg,#9b3bf0,#7a23d6);color:#fff;border-color:#9b3bf0;box-shadow:var(--glow)}
+  .btn.ghost{background:#160f24;color:var(--tx)}
+  .demo{margin:30px auto 0;max-width:600px;background:#0d0916;border:1px solid #281c3d;border-radius:12px;
+        padding:16px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;color:var(--mut);text-align:left}
+  .demo b{color:#c79bff}
+  section{padding:34px 0;border-top:1px solid #1d1530}
+  h2{font-size:24px;margin:0 0 18px}
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .feat div{background:var(--card);border:1px solid #271c3c;border-radius:12px;padding:16px 18px}
+  .feat h3{margin:0 0 6px;font-size:16px}
+  .feat p{margin:0;color:var(--mut);font-size:14.5px}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{padding:10px 12px;border-bottom:1px solid #241a38;text-align:left}
+  th{color:var(--mut);font-weight:600}
+  code{background:#160f24;border:1px solid #2a1f40;border-radius:6px;padding:2px 7px;font-size:13.5px}
+  pre{background:#0d0916;border:1px solid #281c3d;border-radius:10px;padding:14px 16px;overflow:auto}
+  footer{text-align:center;color:var(--mut);padding:40px 0 60px;font-size:14px}
+  @media(max-width:620px){.feat{grid-template-columns:1fr}h1{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="yap-icon.png" alt="yap icon">
+    <h1><b>yap</b> — voice dictation, everywhere</h1>
+    <p class="tag">Hold a key, talk, and what you said lands at the cursor — in any app. Free,
+       open-source, and offline by default. A no-subscription alternative to Wispr Flow.</p>
+    <div class="btns">
+      <a class="btn primary" href="https://github.com/AkuchiS/yap/releases/latest">Download</a>
+      <a class="btn ghost" href="https://github.com/AkuchiS/yap">View on GitHub</a>
+    </div>
+    <div class="demo">
+      you: <i>(hold Right Option ⌥)</i> "send him the q3 numbers by friday"<br>
+      <b>yap:</b> Send him the Q3 numbers by Friday. &nbsp;← typed at your cursor
+    </div>
+  </header>
+
+  <section>
+    <h2>What you get</h2>
+    <div class="feat">
+      <div><h3>Private by default</h3><p>Transcription runs locally with Whisper — no account, no cloud, no telemetry. Your audio only leaves the machine if you choose a cloud engine.</p></div>
+      <div><h3>No caps, no subscription</h3><p>MIT-licensed and unlimited. No weekly word limit, nothing to upsell.</p></div>
+      <div><h3>Every OS</h3><p>macOS, Windows and Linux from one config. Menu-bar app on Mac, system tray on Windows/Linux.</p></div>
+      <div><h3>Learns your words</h3><p>Picks up the names and jargon you repeat, and lets you set per-app profiles for vocab and cleanup.</p></div>
+      <div><h3>Local or cloud</h3><p>Offline faster-whisper by default; point it at Groq/OpenAI or your own Whisper server when you want speed.</p></div>
+      <div><h3>Free forever for early adopters</h3><p>Independently built and self-funded. If a paid tier ever lands, installs from before the cutoff stay free.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>vs Wispr Flow</h2>
+    <table>
+      <tr><th></th><th>Wispr Flow</th><th>yap</th></tr>
+      <tr><td>Price</td><td>$12–15/mo (free: 2k words/wk)</td><td><b>Free, unlimited</b></td></tr>
+      <tr><td>Offline</td><td>Cloud only</td><td><b>Local Whisper by default</b></td></tr>
+      <tr><td>Sends audio to a server</td><td>Always</td><td>Only if you opt into cloud</td></tr>
+      <tr><td>Open source</td><td>No</td><td>Yes (MIT)</td></tr>
+      <tr><td>Platforms</td><td>Mac/Win/iOS/Android</td><td>Mac/Win/Linux</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Install</h2>
+    <p>Download a build above, or with Python 3.9–3.13:</p>
+    <pre>pipx install "yap-dictation[full] @ git+https://github.com/AkuchiS/yap"</pre>
+    <p>Then hold <b>Right Option</b> (Right Ctrl elsewhere), speak, release — your words land at the cursor.</p>
+  </section>
+
+  <footer>
+    MIT-licensed · built by a retired Australian Army veteran ·
+    <a href="https://github.com/AkuchiS/yap">GitHub</a> ·
+    <a href="https://github.com/sponsors/AkuchiS">Sponsor</a>
+  </footer>
+</div>
+</body>
+</html>
