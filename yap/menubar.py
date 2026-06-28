@@ -144,9 +144,24 @@ def run(cfg: dict[str, Any]) -> int:
             except Exception:
                 pass
 
+        def _main(self, fn):
+            """Run a UI mutation on the AppKit main thread. rumps/AppKit are NOT
+            thread-safe — mutating the status item / title / menu from a worker thread
+            corrupts the view hierarchy (the `_enumeratingSubviewsCount` assertion →
+            SIGABRT). callAfter marshals onto the main run loop."""
+            try:
+                from PyObjCTools import AppHelper
+                AppHelper.callAfter(fn)
+            except Exception:
+                try:
+                    fn()
+                except Exception:
+                    pass
+
         def _boot(self):
             self._listener = logic.start_background()
-            self.status_item.title = "Ready — hold your hotkey to dictate"
+            self._main(lambda: setattr(self.status_item, "title",
+                                       "Ready — hold your hotkey to dictate"))
 
         def _check_update(self):
             try:
@@ -182,13 +197,19 @@ def run(cfg: dict[str, Any]) -> int:
                     pass
 
         def _on_status(self, state: str):
-            # called from worker threads; rumps title set is thread-safe enough here
-            self.title = _ICONS.get(state, _ICONS["idle"])
-            self.status_item.title = {
+            # called from worker threads — marshal the UI change onto the main thread
+            # (mutating title/status off-thread trips an AppKit assertion → SIGABRT).
+            title = _ICONS.get(state, _ICONS["idle"])
+            sub = {
                 "idle": "Ready — hold your hotkey to dictate",
                 "listening": "● Listening…",
                 "transcribing": "⏳ Transcribing…",
             }.get(state, "Ready")
+
+            def apply():
+                self.title = title
+                self.status_item.title = sub
+            self._main(apply)
 
         def _toggle_engine(self, sender):
             # flip local <-> cloud for the *next* launch (engine is built at start)

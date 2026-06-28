@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yap-dictation"
-version = "0.1.2"
+version = "0.1.3"
 description = "Free, offline-first, cross-platform voice dictation — speak anywhere, get text at your cursor."
 readme = "README.md"
 license = { text = "MIT" }
