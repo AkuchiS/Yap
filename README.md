@@ -217,6 +217,13 @@ yap vocab list
 `vocab add` feeds Whisper a glossary hint (helps it *spell* unfamiliar words);
 `vocab fix` is a guaranteed find/replace for words it *consistently* mangles.
 
+**Casing sticks too.** Whisper writes proper nouns in lower case, so add a word
+the way you want it written and yap fixes the casing every time — no retyping:
+
+```bash
+yap vocab add AkuchiS DIME PostgreSQL   # now "akuchis"/"dime" come out AkuchiS/DIME
+```
+
 ### It also learns on its own
 
 By default yap **watches what you dictate** and learns the proper nouns, jargon,

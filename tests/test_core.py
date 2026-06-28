@@ -191,6 +191,17 @@ def test_license_grandfather_code_roundtrip_and_cutoff():
         os.environ.pop("YAP_CONFIG_DIR", None)
 
 
+def test_normalize_case_from_vocab():
+    from yap.text import normalize_case
+
+    vocab = ["AkuchiS", "DIME", "GitHub"]
+    assert normalize_case("go to akuchis.com and tell dime", vocab) == "go to AkuchiS.com and tell DIME"
+    assert normalize_case("Akuchis and Dime and github", vocab) == "AkuchiS and DIME and GitHub"
+    assert normalize_case("just a dime store", ["DIME"]) == "just a DIME store"  # you added it → forced
+    assert normalize_case("hello world", ["hello"]) == "hello world"  # lowercase-only vocab: nothing to force
+    assert normalize_case("", vocab) == "" and normalize_case("x", []) == "x"
+
+
 def test_tray_state_image():
     from yap.tray import _state_image
 

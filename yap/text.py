@@ -28,6 +28,28 @@ def build_prompt(vocabulary, base: Optional[str] = None) -> Optional[str]:
     return " ".join(parts) if parts else None
 
 
+def normalize_case(text: str, vocabulary) -> str:
+    """Force the casing of known vocabulary onto the transcript.
+
+    Whisper writes proper nouns in lower-case ("akuchis", "dime"), so once a word
+    is in your vocabulary with deliberate casing ("AkuchiS", "DIME"), rewrite any
+    whole-word, case-insensitive match to that exact casing. This is what makes
+    `yap vocab add AkuchiS` (or DIME) actually correct the casing every time — you
+    add the word once, the way you want it, and stop retyping it.
+    """
+    if not text or not vocabulary:
+        return text
+    canon = {}
+    for w in vocabulary:
+        w = str(w).strip()
+        if w and w.lower() != w:          # only terms with intentional casing
+            canon[w.lower()] = w
+    if not canon:
+        return text
+    return re.sub(r"[A-Za-z][A-Za-z0-9'_-]*",
+                  lambda m: canon.get(m.group(0).lower(), m.group(0)), text)
+
+
 def apply_replacements(text: str, replacements) -> str:
     if not text or not replacements:
         return text

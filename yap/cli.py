@@ -39,10 +39,11 @@ def _cmd_transcribe(args) -> int:
     engine = build_engine(cfg)
     text = engine.transcribe_file(args.file)
     from . import cleanup
-    from .text import apply_replacements
+    from .text import apply_replacements, normalize_case
 
     text = cleanup.maybe_clean(text, cfg)
     text = apply_replacements(text, cfg.get("replacements"))
+    text = normalize_case(text, cfg.get("vocabulary", []))
     print(text)
     return 0
 

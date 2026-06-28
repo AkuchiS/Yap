@@ -16,7 +16,7 @@ from .inject import Injector
 from .integration import Integration
 from .learn import VocabLearner
 from .stt import build_engine
-from .text import apply_replacements, build_prompt
+from .text import apply_replacements, build_prompt, normalize_case
 
 _LEVELS = {"quiet": 0, "normal": 1, "debug": 2}
 
@@ -102,15 +102,16 @@ class App:
             # per-app profile: merge the frontmost app's overrides over the base for
             # this utterance (vocabulary biasing, cleanup, replacements, language).
             eff = config.profile_for(self.cfg, getattr(self, "_active_app", None))
+            vocab = list(eff.get("vocabulary", [])) + self.learner.words()
             try:
-                self.engine.prompt = build_prompt(
-                    list(eff.get("vocabulary", [])) + self.learner.words())
+                self.engine.prompt = build_prompt(vocab)
             except Exception:
                 pass
             t0 = time.time()
             text = self.engine.transcribe_array(audio, self.samplerate)
             text = cleanup.maybe_clean(text, eff)
             text = apply_replacements(text, eff.get("replacements"))
+            text = normalize_case(text, vocab)  # force your vocab's casing (akuchis -> AkuchiS)
             dt = time.time() - t0
             if not text:
                 self._log("… no speech detected — try speaking louder/closer", 1)
