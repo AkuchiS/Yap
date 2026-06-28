@@ -29,6 +29,15 @@ What you get:
   yap: Send him the Q3 numbers by Friday.        ← typed at your cursor
 ```
 
+## Download — no terminal needed
+
+Grab it, unzip, open. That's the whole thing:
+
+| [⬇ macOS](https://github.com/AkuchiS/yap/releases/latest/download/Yap-macOS.zip) | [⬇ Windows](https://github.com/AkuchiS/yap/releases/latest/download/yap-Windows.zip) | [⬇ Linux](https://github.com/AkuchiS/yap/releases/latest/download/yap-Linux.tar.gz) |
+|:---:|:---:|:---:|
+
+> **macOS:** not Apple-signed yet, so the first time **right-click the app → Open** (not double-click), then grant Microphone + Accessibility once. Comfortable with a terminal? See [Install](#install) below.
+
 ## How it compares
 
 | | Wispr Flow | **yap** |
