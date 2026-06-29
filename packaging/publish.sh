@@ -4,10 +4,9 @@
 # never written into the git remote URL or config. Idempotent: creates the repo
 # if missing, otherwise just pushes.
 #
-# Per the access policy, a human pulls the token; this script consumes it:
-#   GH_TOKEN="$(ssh -i ~/.ssh/k root@10.13.0.50 \
-#       'pct exec 100 -- /usr/local/bin/vault-get "<github item>"')" \
-#     ./packaging/publish.sh
+# Per the access policy, a human supplies the token from their own secret store;
+# this script only ever reads it from $GH_TOKEN, e.g.:
+#   GH_TOKEN="$(your-secret-tool get '<github token item>')" ./packaging/publish.sh
 #
 # Or simplest of all, with the GitHub CLI and no raw token:
 #   gh repo create AkuchiS/yap --private --source=. --remote=origin --push
