@@ -104,8 +104,15 @@ def keytest(cfg: dict[str, Any], seconds: int = 12) -> None:
     time.sleep(seconds)
     listener["l"].stop()
     if not seen["any"]:
-        print("  ✗ Saw NO key events at all → this is a trust/permission problem,")
-        print("    not a key-choice problem. Fix Accessibility + Input Monitoring above.")
+        from .hotkey import is_wayland
+        print("  ✗ Saw NO key events at all.")
+        if is_wayland():
+            print("    On Wayland this is EXPECTED — apps can't grab global keys. This is")
+            print("    NOT a permission problem and no key choice fixes it. Bind a")
+            print("    compositor key to `yap toggle` instead (see the note above).")
+        else:
+            print("    → a trust/permission problem, not a key-choice problem.")
+            print("    Fix Accessibility + Input Monitoring above.")
     else:
         print("  (If you saw your hotkey above but no MATCH line, the combo is wrong —")
         print("   copy the 'canonical=' value into hotkey.combo.)")
@@ -154,6 +161,14 @@ def run(cfg: dict[str, Any], prompt: bool, seconds: int) -> int:
     check_trust(prompt=prompt)
 
     _hr("2. Hotkey capture")
+    from .hotkey import is_wayland
+    if is_wayland():
+        print("  ⚠ Wayland session (XDG_SESSION_TYPE=wayland). Wayland blocks apps from")
+        print("    grabbing global hotkeys, so yap's key listener can't fire — no key")
+        print("    choice changes this. Bind a key in your compositor to `yap toggle`:")
+        print("      Hyprland :  bind = SUPER, D, exec, yap toggle")
+        print("      GNOME/KDE:  add a custom shortcut that runs:  yap toggle")
+        print("    Then run `yap run` (or `yap app`) and use that key.")
     keytest(cfg, seconds=seconds)
 
     _hr("3. Microphone")

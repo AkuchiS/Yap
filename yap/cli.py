@@ -105,6 +105,33 @@ def _cmd_devices(_args) -> int:
     return 0
 
 
+def _cmd_toggle(_args) -> int:
+    """Start/stop dictation in the running daemon over its control socket.
+
+    The portable way to trigger yap where a global hotkey can't be grabbed
+    (Wayland): bind a compositor key to `yap toggle`. Silent on success so it's
+    clean to wire to a keybind."""
+    from . import ipc
+
+    ok, msg = ipc.send("toggle")
+    if not ok:
+        print(f"yap: {msg}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_ptt(args) -> int:
+    """Push-to-talk trigger for a compositor keybind that fires on press AND
+    release (e.g. Hyprland `bind`/`bindrt`): press -> start, release -> stop."""
+    from . import ipc
+
+    ok, msg = ipc.send("start" if args.state == "press" else "stop")
+    if not ok:
+        print(f"yap: {msg}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def _cmd_relearn(_args) -> int:
     """Learn from your last correction: diff the clipboard (your fixed text) against
     what yap last typed, and save the word-level changes as fixes / casings."""
@@ -346,6 +373,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     pd = sub.add_parser("devices", help="list microphone input devices")
     pd.set_defaults(func=_cmd_devices)
+
+    ptg = sub.add_parser("toggle",
+                         help="start/stop dictation in the running daemon "
+                              "(bind a Wayland compositor key to this)")
+    ptg.set_defaults(func=_cmd_toggle)
+
+    pptt = sub.add_parser("ptt",
+                          help="push-to-talk trigger for a press/release keybind")
+    pptt.add_argument("state", choices=["press", "release"])
+    pptt.set_defaults(func=_cmd_ptt)
 
     pl = sub.add_parser("license", help="show install date + early-adopter code")
     pl.add_argument("--verify", metavar="CODE",

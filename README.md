@@ -203,6 +203,39 @@ yap config set hotkey.mode  '"toggle"'     # press to start, press to stop
 > cross-platform input library can't see it. Right Option gives you the same
 > one-key feel and works reliably. (A native Fn backend is on the roadmap.)
 
+### Linux: Wayland (Hyprland, GNOME, KDE)
+
+Wayland **deliberately stops apps from grabbing global hotkeys** — it's a security
+design, not a yap bug. So yap's built-in key listener can't see your keypresses in
+a native Wayland session, no matter which key you pick. (X11/Xorg sessions are
+unaffected — the hotkey works as normal.)
+
+The fix is to let your **compositor** own the key and have it poke yap, which runs
+a small local control socket for exactly this:
+
+```bash
+yap run            # or: yap app   — leave it running; it prints the same hint
+```
+
+Then bind a key in your compositor to **`yap toggle`** (start/stop dictation):
+
+```ini
+# Hyprland (~/.config/hypr/hyprland.conf)
+bind = SUPER, D, exec, yap toggle
+```
+
+- **GNOME / KDE:** Settings → Keyboard → *Custom Shortcuts* → add one that runs
+  `yap toggle`.
+- **True push-to-talk** (hold to talk) on a compositor that fires on press *and*
+  release — e.g. Hyprland — use the press/release trigger:
+  ```ini
+  bind  = SUPER, D, exec, yap ptt press
+  bindrt = SUPER, D, exec, yap ptt release
+  ```
+
+`yap toggle` is silent and returns immediately, so it's clean to wire to a keybind.
+Not sure which session you're in? `yap doctor` tells you and prints these steps.
+
 ## Teach it your words
 
 Like Wispr, yap can learn the names and jargon you use so they come out right

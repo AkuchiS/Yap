@@ -20,6 +20,15 @@ from .text import apply_replacements, build_prompt, normalize_case
 
 _LEVELS = {"quiet": 0, "normal": 1, "debug": 2}
 
+_WAYLAND_HELP = (
+    "yap: Wayland session detected — the OS blocks apps from grabbing global\n"
+    "     hotkeys, so the key listener won't fire in Wayland windows (no choice of\n"
+    "     key fixes this). Bind a key in your compositor to drive yap instead:\n"
+    "       Hyprland :  bind = SUPER, D, exec, yap toggle\n"
+    "       GNOME/KDE:  add a custom shortcut that runs:  yap toggle\n"
+    "     The control socket is up now, so `yap toggle` works while this runs."
+)
+
 
 class App:
     def __init__(self, cfg: dict[str, Any]):
@@ -44,6 +53,8 @@ class App:
         self._busy = threading.Lock()  # don't start while still transcribing
         self._last_injection = ""      # what we last typed (for `relearn`)
         self._relearn_listener = None
+        self._recording = False        # is dictation currently capturing? (for toggle)
+        self._ipc = None               # control socket (Wayland keybind / scripts)
 
     def _status(self, state: str) -> None:
         if self.status_cb:
@@ -123,6 +134,7 @@ class App:
 
         self._record_thread = threading.Thread(target=_rec, daemon=True)
         self._record_thread.start()
+        self._recording = True
         # tell other voice apps: pause — and remember which app we're dictating into
         self._active_app = self.integration.record_started()
         self._status("listening")
@@ -130,11 +142,41 @@ class App:
         self._log(f"● listening…{app_note}", 1)
 
     def on_stop(self):
+        self._recording = False
         self._stop_event.set()
         self._status("transcribing")
         self._log("◼ processing…", 2)
         # process off the hotkey thread so the listener stays responsive
         threading.Thread(target=self._finish, daemon=True).start()
+
+    def toggle(self):
+        """Flip dictation on/off. The entry point for an external trigger — a
+        Wayland compositor keybind (`yap toggle`), a script, a Stream Deck —
+        mirroring one press of the hotkey."""
+        if self._recording:
+            self.on_stop()
+        else:
+            self.on_start()
+
+    def _ipc_command(self, cmd: str) -> str:
+        """Dispatch a control-socket command (see `yap.ipc`). Runs on the socket
+        thread; on_start/on_stop are already thread-safe (the hotkey calls them off
+        the main thread too)."""
+        c = (cmd or "").strip().lower()
+        if c in ("toggle", ""):
+            self.toggle()
+            return "recording" if self._recording else "idle"
+        if c in ("start", "press"):
+            self.on_start()
+            return "recording"
+        if c in ("stop", "release"):
+            self.on_stop()
+            return "idle"
+        if c == "relearn":
+            return "ok " + self.on_relearn()
+        if c in ("ping", "status"):
+            return "recording" if self._recording else "idle"
+        return f"err: unknown command {c!r}"
 
     def _log(self, msg: str, level: int = 1) -> None:
         # flush so messages appear immediately, even through a pipe
@@ -223,7 +265,20 @@ class App:
                 self._relearn_listener.start()
             except Exception as e:
                 self._log(f"yap: relearn hotkey unavailable ({e})", 2)
-        return HotkeyListener(combo, mode, self.on_start, self.on_stop).start()
+
+        # Control socket: lets an external trigger drive dictation. Essential on
+        # Wayland (global hotkeys can't be grabbed there); harmless everywhere else.
+        from . import ipc
+        from .hotkey import is_wayland
+        self._ipc = ipc.Server(self._ipc_command).start()
+        if is_wayland():
+            self._log(_WAYLAND_HELP, 0)
+
+        listener = HotkeyListener(combo, mode, self.on_start, self.on_stop).start()
+        if not listener.started and not is_wayland():
+            self._log(f"yap: global hotkey listener unavailable ({listener.error}). "
+                      "Bind a key to `yap toggle` to dictate.", 0)
+        return listener
 
     def run(self):
         combo = self.cfg["hotkey"]["combo"]
@@ -235,11 +290,18 @@ class App:
         listener = self.start_background()
         self._log("Ready. (Ctrl+C to quit)\n", 1)
         try:
-            listener.join()
+            if listener.started:
+                listener.join()
+            elif self._ipc is not None:
+                self._ipc.join()   # no global hotkey (Wayland/no-X): stay up for `yap toggle`
+            else:
+                listener.join()    # nothing to wait on; returns immediately
         except KeyboardInterrupt:
             self._log("\nyap: bye.", 1)
         finally:
             listener.stop()
+            if self._ipc is not None:
+                self._ipc.stop()
             self.stop_relearn()
 
 

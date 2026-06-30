@@ -8,8 +8,21 @@ Combo syntax follows pynput, e.g. "<ctrl>+<alt>", "<cmd>+<shift>", "<f9>".
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import Callable
+
+
+def is_wayland() -> bool:
+    """True on a native Wayland session.
+
+    Wayland deliberately blocks applications from grabbing global hotkeys, so the
+    pynput listener can't see keypresses in native Wayland windows no matter which
+    key you bind. The supported path there is a compositor keybind -> `yap toggle`
+    (see `yap.ipc`).
+    """
+    return (os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland"
+            or bool(os.environ.get("WAYLAND_DISPLAY")))
 
 
 def key_sig(key):
@@ -46,6 +59,7 @@ class HotkeyListener:
         self.on_stop = on_stop
         self._listener = None
         self._active = False  # currently recording?
+        self.error = None     # set if the pynput backend couldn't start (e.g. no X)
 
     # -- toggle ---------------------------------------------------------------
     def _start_toggle(self):
@@ -101,11 +115,25 @@ class HotkeyListener:
         self._listener.start()
 
     def start(self):
-        if self.mode == "hold":
-            self._start_hold()
-        else:
-            self._start_toggle()
+        # Starting the pynput backend can fail on a session with no reachable X
+        # server (e.g. a headless or pure-Wayland login). Don't let that crash the
+        # daemon — record the error and let the caller fall back to the control
+        # socket (`yap toggle`). `started` stays False so callers know.
+        try:
+            if self.mode == "hold":
+                self._start_hold()
+            else:
+                self._start_toggle()
+        except Exception as e:  # noqa: BLE001
+            self.error = e
+            self._listener = None
         return self
+
+    @property
+    def started(self) -> bool:
+        """Whether the pynput backend actually came up. (On Wayland it may come up
+        via XWayland yet still see nothing from native Wayland windows.)"""
+        return self._listener is not None
 
     def join(self):
         if self._listener is not None:
