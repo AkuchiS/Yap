@@ -21,14 +21,11 @@ multiprocessing.freeze_support()  # handles the --multiprocessing-fork relaunch
 from yap.cli import main
 
 if len(sys.argv) == 1:
-    # Double-clicked with no args: run the dictation daemon directly.
-    #
-    # NOT the menu-bar app on macOS: a menu-bar app runs an NSApplication event
-    # loop, which forces the keyboard library to touch the Text Input Source API
-    # off the main thread — and macOS 26 aborts the process for that. The headless
-    # daemon keeps a single listener and TIS-free injection, so it runs cleanly.
-    # (`yap app` is still available explicitly for testing the future main-thread
-    # menu-bar build.)
-    sys.argv.append("run")
+    # Double-clicked with no args → the menu-bar app on macOS (icon + menu),
+    # the run daemon elsewhere. The menu-bar app is now crash-safe on macOS 26:
+    # it's a thin UI that spawns a SEPARATE headless `yap run` daemon for the
+    # keyboard work, so the UI process never touches the Text Input Source API
+    # that aborts when used off the main thread (see yap/menubar.py).
+    sys.argv.append("app" if sys.platform == "darwin" else "run")
 
 raise SystemExit(main())
