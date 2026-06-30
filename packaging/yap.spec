@@ -22,6 +22,18 @@ PKG_ROOT = SPECPATH                       # packaging/ (SPECPATH is already a di
 PROJECT = os.path.dirname(PKG_ROOT)       # repo root
 ENTRY = os.path.join(PKG_ROOT, "entry.py")
 
+
+def _version():
+    """Read the single source of truth in yap/__init__.py (don't hardcode it)."""
+    import re
+
+    init = os.path.join(PROJECT, "yap", "__init__.py")
+    m = re.search(r'__version__\s*=\s*"([^"]+)"', open(init, encoding="utf-8").read())
+    return m.group(1) if m else "0.0.0"
+
+
+VERSION = _version()
+
 datas, binaries, hiddenimports = [], [], []
 
 
@@ -89,12 +101,12 @@ if sys.platform == "darwin":
         name="Yap.app",
         icon=os.environ.get("YAP_ICNS") or None,
         bundle_identifier="com.yap.dictation",
-        version="0.1.0",
+        version=VERSION,
         info_plist={
             "CFBundleName": "Yap",
             "CFBundleDisplayName": "Yap",
-            "CFBundleShortVersionString": "0.1.0",
-            "CFBundleVersion": "0.1.0",
+            "CFBundleShortVersionString": VERSION,
+            "CFBundleVersion": VERSION,
             "LSMinimumSystemVersion": "11.0",
             "NSHighResolutionCapable": True,
             "LSUIElement": bool(os.environ.get("YAP_MENUBAR_ONLY")),
