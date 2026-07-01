@@ -84,7 +84,10 @@ git clone https://github.com/AkuchiS/yap.git && cd yap && ./install.sh && yap ru
   `xclip` / `xsel`. On **Wayland**, install `wl-clipboard`; some compositors
   restrict synthetic keystrokes — use `--engine local` with
   `inject.method = "type"` if paste doesn't land.
-- **Windows** — no extra steps; run from a normal terminal.
+- **Windows** — no extra steps; run from a normal terminal. **Updating:** stop yap
+  first (Ctrl-C the `yap run` window / quit the app) before `pipx upgrade
+  yap-dictation` — a running worker holds `yap.exe` open, so an in-place upgrade
+  otherwise hits `WinError 32` (file in use).
 
 ## Usage
 

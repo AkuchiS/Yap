@@ -57,6 +57,20 @@ def check_trust(prompt: bool = False):
     return trusted
 
 
+def _no_key_hint() -> None:
+    """Platform-appropriate advice when the hotkey listener saw no key events (non-Wayland)."""
+    if sys.platform == "darwin":
+        print("    → a trust/permission problem, not a key-choice problem. Add the app you ran")
+        print("    this from to Accessibility AND Input Monitoring above, then Cmd+Q and reopen.")
+    elif sys.platform.startswith("win"):
+        print("    → on Windows there's no Accessibility gate. Usually another app is grabbing the")
+        print("    key, or a fullscreen/elevated app is stealing input. Try a different hotkey")
+        print("    (`yap config set hotkey.combo '\"<f9>\"'`), or run the terminal as Administrator.")
+    else:
+        print("    → on Linux/X11, global keys should work — check no other app has grabbed the")
+        print("    key, and try a different combo. (On Wayland the listener can't fire at all.)")
+
+
 def keytest(cfg: dict[str, Any], seconds: int = 12) -> None:
     try:
         from pynput import keyboard
@@ -111,8 +125,7 @@ def keytest(cfg: dict[str, Any], seconds: int = 12) -> None:
             print("    NOT a permission problem and no key choice fixes it. Bind a")
             print("    compositor key to `yap toggle` instead (see the note above).")
         else:
-            print("    → a trust/permission problem, not a key-choice problem.")
-            print("    Fix Accessibility + Input Monitoring above.")
+            _no_key_hint()
     else:
         print("  (If you saw your hotkey above but no MATCH line, the combo is wrong —")
         print("   copy the 'canonical=' value into hotkey.combo.)")
@@ -177,7 +190,11 @@ def run(cfg: dict[str, Any], prompt: bool, seconds: int) -> int:
     _hr("4. Clipboard")
     cliptest()
 
-    print("\nDone. The #1 fix when section 2 saw no keys: add the app you ran this")
-    print("from to Accessibility AND Input Monitoring, then Cmd+Q and reopen it.")
-    print("Tip: `yap doctor --prompt` pops the macOS 'allow control' dialog for you.")
+    if sys.platform == "darwin":
+        print("\nDone. The #1 fix when section 2 saw no keys: add the app you ran this from to")
+        print("Accessibility AND Input Monitoring, then Cmd+Q and reopen it.")
+        print("Tip: `yap doctor --prompt` pops the macOS 'allow control' dialog for you.")
+    else:
+        print("\nDone. If section 2 saw no keys (and you're not on Wayland), another app is likely")
+        print("grabbing the hotkey — pick a free one: `yap config set hotkey.combo '\"<f9>\"'`.")
     return 0
