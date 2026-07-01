@@ -31,9 +31,9 @@ What you get:
 
 ## Download — no terminal needed
 
-Download, open the `.dmg`, drag **Yap** to Applications. That's the whole thing:
+Grab it for your platform — macOS is a signed, notarized app; Windows & Linux install in one line (see [Install](#install)):
 
-| [⬇ macOS (.dmg)](https://github.com/AkuchiS/Yap/releases/latest) | [Windows (pipx)](#install) | [Linux (pipx)](#install) |
+| [![macOS](https://img.shields.io/badge/macOS-download_.dmg-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/AkuchiS/Yap/releases/latest) | [![Windows](https://img.shields.io/badge/Windows-install-0078D6?style=for-the-badge&logo=windows&logoColor=white)](#install) | [![Linux](https://img.shields.io/badge/Linux-install-FCC624?style=for-the-badge&logo=linux&logoColor=black)](#install) |
 |:---:|:---:|:---:|
 
 > **macOS:** signed & notarized — just open it (no right-click dance). On first launch, **Allow** the Microphone, Accessibility, and Input Monitoring prompts; after allowing Accessibility, **quit and reopen Yap once** so the hotkey activates. Then hold your hotkey and talk. Comfortable with a terminal? See [Install](#install) below.
@@ -52,24 +52,28 @@ Download, open the `.dmg`, drag **Yap** to Applications. That's the whole thing:
 ## Install
 
 Requires **Python 3.9–3.13** (3.14 is too new — some native deps don't have
-wheels for it yet). The local engine downloads a small Whisper model on first use. Clone, run the installer, go:
+wheels for it yet). The local engine downloads a small Whisper model on first use.
+
+**Any OS — one line** (recommended, and the way to install on **Windows**), via
+[pipx](https://pipx.pypa.io):
 
 ```bash
-git clone https://github.com/AkuchiS/yap.git
-cd yap
-./install.sh
+pipx install "yap-dictation[full] @ git+https://github.com/AkuchiS/yap"
 yap run
 ```
 
-`./install.sh` sets up an isolated [pipx](https://pipx.pypa.io) environment so
-nothing pollutes your system Python. Then hold **Right Option**, speak, and let
-go; your words land at the cursor.
+The `[full]` extra pulls the desktop bits (macOS menu-bar `rumps`); plain `git+…`
+installs the core CLI only, so `yap app` won't start without it.
 
-> Prefer a one-liner?
-> `pipx install "yap-dictation[full] @ git+https://github.com/AkuchiS/yap"`
-> does the same thing. The `[full]` extra pulls in the macOS menu-bar bits
-> (`rumps`); plain `git+…` installs the core CLI only, so `yap app` won't start
-> without it.
+**macOS / Linux — clone + installer** (sets up the pipx env for you):
+
+```bash
+git clone https://github.com/AkuchiS/yap.git && cd yap && ./install.sh && yap run
+```
+
+> `./install.sh` is a **bash script — macOS/Linux only**. On **Windows**, use the
+> pipx one-liner above (from PowerShell or any terminal). Then hold **Right
+> Option**, speak, and let go; your words land at the cursor.
 
 ### Per-OS extras
 
@@ -80,7 +84,10 @@ go; your words land at the cursor.
   `xclip` / `xsel`. On **Wayland**, install `wl-clipboard`; some compositors
   restrict synthetic keystrokes — use `--engine local` with
   `inject.method = "type"` if paste doesn't land.
-- **Windows** — no extra steps; run from a normal terminal.
+- **Windows** — no extra steps; run from a normal terminal. **Updating:** stop yap
+  first (Ctrl-C the `yap run` window / quit the app) before `pipx upgrade
+  yap-dictation` — a running worker holds `yap.exe` open, so an in-place upgrade
+  otherwise hits `WinError 32` (file in use).
 
 ## Usage
 
