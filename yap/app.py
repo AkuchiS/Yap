@@ -100,7 +100,9 @@ class App:
             return self._said("Copy your corrected text first, then trigger relearn.")
         fixes, casings = diff_corrections(last, corrected)
         if not fixes and not casings:
-            return self._said("No clear correction spotted between them.")
+            return self._said("Couldn't spot a short word-fix there. Relearn learns brief swaps "
+                              "(a mis-heard word into the right one) -- copy just the corrected word, "
+                              "or use 'Remember the copied word' to save one outright.")
         cfg = config.load()
         cfg.setdefault("replacements", {}).update(fixes)
         vocab = cfg.setdefault("vocabulary", [])
@@ -114,6 +116,28 @@ class App:
         except Exception:
             pass
         return self._said("Learned: " + ", ".join(list(fixes.values()) + casings))
+
+    def on_remember(self) -> str:
+        """Foolproof: take whatever's on the clipboard and add it to the vocabulary
+        outright (no diffing, no last-dictation needed). One copied word = one saved term."""
+        from .inject import clipboard_get
+        word = (clipboard_get() or "").strip()
+        if not word:
+            return self._said("Copy a word first, then choose 'Remember the copied word'.")
+        if len(word) > 64 or len(word.split()) > 6:
+            return self._said("That's a lot to remember as one term -- copy just the word or short phrase.")
+        cfg = config.load()
+        vocab = cfg.setdefault("vocabulary", [])
+        if word in vocab:
+            return self._said("Already remembered: " + word)
+        vocab.append(word)
+        config.save(cfg)
+        self.cfg = cfg  # hot-apply
+        try:
+            self._refresh_prompt()
+        except Exception:
+            pass
+        return self._said("Remembered: " + word)
 
     def stop_relearn(self) -> None:
         if self._relearn_listener is not None:

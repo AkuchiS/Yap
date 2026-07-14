@@ -27,8 +27,8 @@ _STRIP = " \t\n.,;:!?\"'()[]{}"
 # Cap how big a single learned phrase-fix can be, so a whole-sentence rewrite
 # isn't saved as one giant find/replace. Short spans are genuine corrections
 # ("post grey sequel" -> "PostgreSQL"); long ones are messy edits we ignore.
-_MAX_FIX_WORDS = 4
-_MAX_FIX_CHARS = 48
+_MAX_FIX_WORDS = 6
+_MAX_FIX_CHARS = 64
 
 
 def _phrase(words) -> str:

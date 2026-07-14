@@ -166,6 +166,7 @@ def run(cfg: dict[str, Any]) -> int:
                 None,
                 rumps.MenuItem("Start / stop dictation", callback=self._toggle),
                 rumps.MenuItem("Learn from my last correction", callback=self._relearn),
+                rumps.MenuItem("Remember the copied word", callback=self._remember),
                 None,
                 rumps.MenuItem("Quit Yap", callback=self._quit),
             ]
@@ -256,6 +257,12 @@ def run(cfg: dict[str, Any]) -> int:
                 self._notify("still starting the engine…")
                 return
             self.app.on_relearn()  # result is surfaced via notify_cb
+
+        def _remember(self, _sender):
+            if self.app is None:
+                self._notify("still starting the engine…")
+                return
+            self.app.on_remember()  # result is surfaced via notify_cb
 
         def _notify(self, msg):
             self.status_item.title = msg
