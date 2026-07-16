@@ -15,12 +15,67 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - name: Build Yap.app
+      - name: Build the .icns icon
         run: |
-          chmod +x packaging/build_macos.sh
-          YAP_BUILD_PY=python3 ./packaging/build_macos.sh
-      - name: Zip
-        run: cd dist && ditto -c -k --keepParent Yap.app ../Yap-macOS.zip
+          set -euxo pipefail
+          ICON=packaging/yap-icon-macos.png
+          WORK=$(mktemp -d); ISET="$WORK/yap.iconset"; mkdir -p "$ISET"
+          for s in 16 32 128 256 512; do
+            sips -z $s $s "$ICON" --out "$ISET/icon_${s}x${s}.png"
+            sips -z $((s*2)) $((s*2)) "$ICON" --out "$ISET/icon_${s}x${s}@2x.png"
+          done
+          iconutil -c icns "$ISET" -o "$WORK/yap.icns"
+          echo "YAP_ICNS=$WORK/yap.icns" >> "$GITHUB_ENV"
+      - name: Install + freeze the app
+        run: |
+          set -euxo pipefail
+          python -m pip install -U pip wheel
+          pip install ".[full]" pyinstaller pillow pyobjc-framework-ApplicationServices
+          pyinstaller packaging/yap.spec --noconfirm
+          test -d dist/Yap.app
+      - name: Sign — Developer ID if secrets present, else ad-hoc
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${CERT_P12:-}" ]; then
+            echo "==> Developer ID signing (hardened runtime + entitlements)"
+            KCHAIN=build.keychain; KPW="ci-$RANDOM-$RANDOM"
+            security create-keychain -p "$KPW" "$KCHAIN"
+            security set-keychain-settings -lut 21600 "$KCHAIN"
+            security unlock-keychain -p "$KPW" "$KCHAIN"
+            echo "$CERT_P12" | base64 --decode > cert.p12
+            security import cert.p12 -k "$KCHAIN" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+            security list-keychains -d user -s "$KCHAIN" login.keychain
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KPW" "$KCHAIN" >/dev/null
+            codesign --force --deep --options runtime --timestamp \
+              --entitlements packaging/entitlements.plist --sign "$SIGN_IDENTITY" dist/Yap.app
+            codesign --verify --deep --strict --verbose=2 dist/Yap.app
+          else
+            echo "::warning::No MACOS_CERT_P12 secret — falling back to ad-hoc. Downloads WILL hit Gatekeeper and permissions will not persist across updates. Add the Developer ID secrets to fix."
+            codesign --force --deep --sign - dist/Yap.app || true
+          fi
+      - name: Notarize + staple — only if notary secrets present
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "${NOTARY_APPLE_ID:-}" ]; then
+            echo "==> submitting to Apple notary service"
+            ditto -c -k --keepParent dist/Yap.app notarize.zip
+            xcrun notarytool submit notarize.zip \
+              --apple-id "$NOTARY_APPLE_ID" --password "$NOTARY_PASSWORD" --team-id "$NOTARY_TEAM_ID" --wait
+            xcrun stapler staple dist/Yap.app
+            xcrun stapler validate dist/Yap.app
+          else
+            echo "::warning::No NOTARY_APPLE_ID secret — app is not notarized; Gatekeeper will block the download."
+          fi
+      - name: Zip the (stapled) app
+        run: ditto -c -k --keepParent dist/Yap.app Yap-macOS.zip
       - uses: actions/upload-artifact@v4
         with: { name: Yap-macOS, path: Yap-macOS.zip }
 
