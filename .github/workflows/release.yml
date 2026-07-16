@@ -74,6 +74,25 @@ jobs:
           else
             echo "::warning::No NOTARY_APPLE_ID secret — app is not notarized; Gatekeeper will block the download."
           fi
+      - name: Verify the download is REALLY signed + notarized (hard-fail on a tagged release)
+        # The whole "downloaded Yap won't open / won't dictate" saga happened because a broken
+        # ad-hoc build shipped while CI stayed green. On a real release we now REFUSE to ship
+        # unless the app is Developer-ID signed AND Gatekeeper accepts it as notarized.
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          echo "== codesign authority =="
+          codesign -dv --verbose=4 dist/Yap.app 2>&1 | tee /tmp/cs.txt
+          grep -q "Authority=Developer ID Application" /tmp/cs.txt \
+            || { echo "::error::Yap.app is ad-hoc / not Developer-ID signed — refusing to ship a broken release. Check the MACOS_* secrets."; exit 1; }
+          echo "== staple validation =="
+          xcrun stapler validate dist/Yap.app \
+            || { echo "::error::Notarization ticket is not stapled — refusing to ship. Check the NOTARY_* secrets."; exit 1; }
+          echo "== Gatekeeper assessment =="
+          spctl -a -vvv --type execute dist/Yap.app 2>&1 | tee /tmp/spctl.txt
+          grep -q "source=Notarized Developer ID" /tmp/spctl.txt \
+            || { echo "::error::Gatekeeper did not accept the app as Notarized Developer ID — refusing to ship."; exit 1; }
+          echo "✓ signed by Developer ID + notarized + Gatekeeper-accepted — safe to ship"
       - name: Zip the (stapled) app
         run: ditto -c -k --keepParent dist/Yap.app Yap-macOS.zip
       - uses: actions/upload-artifact@v4
