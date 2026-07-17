@@ -168,6 +168,7 @@ def run(cfg: dict[str, Any]) -> int:
                 rumps.MenuItem("Learn from my last correction", callback=self._relearn),
                 rumps.MenuItem("Remember the copied word", callback=self._remember),
                 None,
+                rumps.MenuItem("Set up permissions…", callback=self._setup),
                 rumps.MenuItem("Quit Yap", callback=self._quit),
             ]
             # Install the key tap NOW, on this (the main) thread — it's trusted the
@@ -190,7 +191,10 @@ def run(cfg: dict[str, Any]) -> int:
                 except Exception:
                     pass
 
-        # -- microphone grant (main thread, post-launch) --------------------
+        # -- first-run setup (main thread, post-launch) ---------------------
+        # A new user has to grant 3 permissions and macOS won't let us do it for
+        # them. Rather than leave them staring at a menu-bar icon that silently
+        # does nothing, walk them through it with one-tap links to each pane.
         def _ask_mic(self, timer):
             timer.stop()
             try:
@@ -198,7 +202,11 @@ def run(cfg: dict[str, Any]) -> int:
                 NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
             except Exception:
                 pass
-            _request_microphone(print)
+            from . import first_run
+            if first_run.needed():
+                first_run.run(print)
+            else:
+                _request_microphone(print)
 
         # -- key tap (main thread) ------------------------------------------
         def _install_tap(self):
@@ -263,6 +271,13 @@ def run(cfg: dict[str, Any]) -> int:
                 self._notify("still starting the engine…")
                 return
             self.app.on_remember()  # result is surfaced via notify_cb
+
+        def _setup(self, _sender):
+            """Re-open the guided permission setup any time (e.g. after 'Later',
+            or if a grant gets revoked and dictation goes quiet)."""
+            from . import first_run
+            if first_run.run(print):
+                self._install_tap()          # re-arm the key tap now that we're trusted
 
         def _notify(self, msg):
             self.status_item.title = msg

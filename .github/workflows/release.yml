@@ -9,6 +9,22 @@ on:
     tags: ["v*"]
 
 jobs:
+  # The suite never ran in CI — nothing verified the code before it shipped, which is
+  # the same disease that let an ad-hoc build reach users. A release now can't publish
+  # unless these pass.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install yap (for imports)
+        run: python -m pip install -U pip && pip install -e .
+      - name: Run the offline test suite
+        run: |
+          set -euo pipefail
+          for t in tests/test_*.py; do echo "── $t"; python "$t"; done
+
   macos:
     runs-on: macos-14
     steps:
@@ -132,7 +148,7 @@ jobs:
         with: { name: yap-Linux, path: yap-Linux.tar.gz }
 
   release:
-    needs: [macos, windows, linux]
+    needs: [test, macos, windows, linux]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions: { contents: write }
