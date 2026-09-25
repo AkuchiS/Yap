@@ -53,7 +53,7 @@ def _chat(text: str, cc: dict[str, Any], api_key: str) -> str:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             # Optional OpenRouter attribution headers (harmless elsewhere):
-            "HTTP-Referer": "https://github.com/yap-dictation/yap",
+            "HTTP-Referer": "https://github.com/AkuchiS/Yap",
             "X-Title": "yap",
         },
     )

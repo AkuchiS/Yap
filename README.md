@@ -33,7 +33,7 @@ What you get:
 
 Grab it for your platform — macOS is a signed, notarized app; Windows & Linux install in one line (see [Install](#install)):
 
-| [![macOS](https://img.shields.io/badge/macOS-download_.dmg-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/AkuchiS/Yap/releases/latest) | [![Windows](https://img.shields.io/badge/Windows-install-0078D6?style=for-the-badge&logo=windows&logoColor=white)](#install) | [![Linux](https://img.shields.io/badge/Linux-install-FCC624?style=for-the-badge&logo=linux&logoColor=black)](#install) |
+| [![macOS](https://img.shields.io/badge/macOS-download_.zip-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/AkuchiS/Yap/releases/latest) | [![Windows](https://img.shields.io/badge/Windows-install-0078D6?style=for-the-badge&logo=windows&logoColor=white)](#install) | [![Linux](https://img.shields.io/badge/Linux-install-FCC624?style=for-the-badge&logo=linux&logoColor=black)](#install) |
 |:---:|:---:|:---:|
 
 > **macOS:** signed & notarized — just open it (no right-click dance). On first launch, **Allow** the Microphone, Accessibility, and Input Monitoring prompts; after allowing Accessibility, **quit and reopen Yap once** so the hotkey activates. Then hold your hotkey and talk. Comfortable with a terminal? See [Install](#install) below.
@@ -364,10 +364,10 @@ If you just want a Dock launcher fast and don't mind that permissions show under
 calls your installed yap. Good for personal use; the frozen build above is the
 one to ship.
 
-## Run it in the background (recommended)
+## Run the CLI in the background
 
-The simplest way to *just use it* — no terminal window, no menu-bar app — is a
-login agent:
+If you installed the command-line version instead of the signed macOS app, a
+login agent can run it without a terminal window:
 
 ```bash
 yap autostart          # runs yap in the background now + at every login
@@ -377,33 +377,34 @@ yap autostart --off    # turn it back off
 Then hold your hotkey and dictate, forever. (First time, grant the Python it
 points at **Input Monitoring + Accessibility** once — see below.)
 
-> **macOS note:** on macOS 26 use `yap autostart`, **not** the menu-bar `yap app`.
-> A desktop app event loop makes the keyboard library touch macOS's text-input
-> API from the wrong thread and the OS kills it; the headless background agent
-> doesn't, so it's the stable path until the signed app ships.
+> **macOS note:** the signed `Yap.app` download is the recommended route on
+> macOS 26. It uses an in-process, main-thread Quartz key tap and keeps all three
+> permission grants attached to the signed app. Use `yap autostart` only for a
+> command-line installation.
 
 **Other platforms:** `yap autostart` also sets up a systemd **user** service on
 Linux. Windows: add a shortcut to `yap run` in the Startup folder.
 
 ## macOS permissions (read this if the hotkey "does nothing")
 
-yap needs two macOS permissions: **Input Monitoring** (to see your hotkey) and
-**Accessibility** (to type at your cursor). macOS doesn't always prompt — so the
-reliable way is to add yap **by hand**:
+yap needs three macOS permissions: **Microphone** (to hear you), **Input
+Monitoring** (to see your hotkey), and **Accessibility** (to type at your
+cursor). The current app opens a guided setup on first launch. If a permission
+still shows as missing, add yap **by hand**:
 
-1. System Settings → Privacy & Security → **Input Monitoring** → click **`+`** →
+1. In System Settings → Privacy & Security → **Microphone**, turn **Yap** on.
+2. Go to **Input Monitoring** → click **`+`** →
    press **⌘⇧G**, enter `/Applications/Yap.app`, **Add**, toggle it **on**.
-2. Do the same under **Accessibility**.
-3. **Quit yap fully and reopen it** — grants only take effect on relaunch.
+3. Do the same under **Accessibility**.
+4. **Quit Yap fully and reopen it** — grants only take effect on relaunch.
 
 Running the CLI (`yap run`) from a terminal instead of the app? Grant **your
 terminal app** those two permissions rather than Yap.app.
 
-**Rebuilt the app and it stopped working?** An unsigned app's identity changes
-every build, so old grants go stale and show "on" but don't apply. Reset and
-re-add: `tccutil reset All com.yap.dictation`, then repeat the steps above. (A
-single downloaded build doesn't have this problem — it's only an issue when you
-rebuild repeatedly.)
+**Locally rebuilt the app and it stopped working?** An ad-hoc build's identity
+changes, so old grants can go stale and show "on" but not apply. Reset and
+re-add: `tccutil reset All com.yap.dictation`, then repeat the steps above. The
+Developer-ID signed release download keeps a stable identity across updates.
 
 ## Privacy
 

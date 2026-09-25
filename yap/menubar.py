@@ -160,6 +160,9 @@ def run(cfg: dict[str, Any]) -> int:
             self.app: Optional[App] = None   # in-process engine (set once warm)
             self.tap = None                  # main-thread Quartz key tap
             self.status_item = rumps.MenuItem("Starting the dictation engine…")
+            self.update_info = None
+            self.update_item = rumps.MenuItem("Check for updates…",
+                                               callback=self._update_action)
             self.menu = [
                 self.status_item,
                 rumps.MenuItem(describe_mode(mode, combo)),
@@ -169,12 +172,16 @@ def run(cfg: dict[str, Any]) -> int:
                 rumps.MenuItem("Remember the copied word", callback=self._remember),
                 None,
                 rumps.MenuItem("Set up permissions…", callback=self._setup),
+                self.update_item,
                 rumps.MenuItem("Quit Yap", callback=self._quit),
             ]
             # Install the key tap NOW, on this (the main) thread — it's trusted the
             # moment the grants exist. Warm the heavy engine off the UI thread.
             self._install_tap()
             threading.Thread(target=self._boot, daemon=True).start()
+            # Keep installed apps from silently drifting several releases behind.
+            # This is a cached, once-a-day call to GitHub's public Releases API.
+            threading.Thread(target=self._check_update, daemon=True).start()
             # Ask for the mic AFTER the run loop is live and the app is frontmost
             # (a pre-run-loop request often never shows its dialog). One-shot.
             self._mic_timer = rumps.Timer(self._ask_mic, 1.2)
@@ -278,6 +285,51 @@ def run(cfg: dict[str, Any]) -> int:
             from . import first_run
             if first_run.run(print):
                 self._install_tap()          # re-arm the key tap now that we're trusted
+
+        # -- updates --------------------------------------------------------
+        def _check_update(self, *, force=False, open_when_available=False):
+            from . import update as _update
+
+            info = _update.check_for_update(force=force)
+
+            def done():
+                if info is None:
+                    self.update_item.title = "Check for updates…"
+                    if force:
+                        self._notify("Couldn't check for updates — you may be offline")
+                    return
+                if not info["available"]:
+                    self.update_info = None
+                    self.update_item.title = "Check for updates…"
+                    if force:
+                        self._notify(f"Yap {info['current']} is up to date")
+                    return
+
+                self.update_info = info
+                self.update_item.title = (
+                    f"Update available: {info['latest']} — download…")
+                if open_when_available:
+                    if not _update.apply(info):
+                        self._notify("Couldn't open the download page")
+                else:
+                    self._notify(
+                        f"Yap {info['latest']} is available — open the Yap menu to download")
+
+            self._main(done)
+
+        def _update_action(self, _sender):
+            if self.update_info and self.update_info.get("available"):
+                from . import update as _update
+                if not _update.apply(self.update_info):
+                    self._notify("Couldn't open the download page")
+                return
+
+            self.update_item.title = "Checking for updates…"
+            threading.Thread(
+                target=self._check_update,
+                kwargs={"force": True, "open_when_available": True},
+                daemon=True,
+            ).start()
 
         def _notify(self, msg):
             self.status_item.title = msg

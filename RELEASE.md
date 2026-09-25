@@ -6,18 +6,9 @@ Python, no building.
 
 ## One-time setup
 
-1. **Activate the CI workflow.** It ships parked at
-   `packaging/release.workflow.yml` (GitHub blocks tokens without the `workflow`
-   permission from writing into `.github/workflows/`). Move it into place with a
-   login that has that permission — a `gh auth login` session does:
-   ```bash
-   mkdir -p .github/workflows
-   git mv packaging/release.workflow.yml .github/workflows/release.yml
-   git commit -m "activate CI" && git push
-   ```
-   No workflow permission? Open GitHub → **Add file → Create new file**, name it
-   `.github/workflows/release.yml`, and paste in the contents of
-   `packaging/release.workflow.yml`. (The web editor has the permission.)
+1. **Confirm the CI workflow is active.** The canonical workflow is already at
+   `.github/workflows/release.yml`. Tagged releases are blocked unless the macOS
+   app is Developer-ID signed, notarized, stapled, and accepted by Gatekeeper.
 
 2. **Make the repo public** — Settings → General → Change visibility. Actions is
    free on public repos (it burns limited minutes on private ones).
@@ -38,7 +29,7 @@ GitHub Actions builds all three and publishes a Release at
 
 | File | What the user does |
 |---|---|
-| `Yap-macOS.zip` | unzip → drag `Yap.app` to Applications → open (right-click → Open the first time). Grant Mic + Accessibility + Input Monitoring. |
+| `Yap-macOS.zip` | unzip → drag `Yap.app` to Applications → open normally. Grant Mic + Accessibility + Input Monitoring, then quit and reopen once. |
 | `yap-Windows.zip` | unzip → double-click `yap.exe` → hold **Right Ctrl**, talk. No permissions needed. |
 | `yap-Linux.tar.gz` | extract → run `yap/yap` (needs `libportaudio2`). |
 

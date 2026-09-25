@@ -54,7 +54,8 @@ for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "tokenizers"):
     _collect(pkg, required=True)
 
 # Optional: present on a full desktop, absent on a headless build box.
-for pkg in ("av", "sounddevice", "pynput", "pyperclip", "rumps", "PIL", "numpy"):
+for pkg in ("av", "sounddevice", "pynput", "pyperclip", "rumps", "PIL", "numpy",
+            "certifi"):
     _collect(pkg)
 
 # pyobjc bits the menu-bar app needs on macOS (rumps' deps + permission APIs).

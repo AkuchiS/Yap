@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yap-dictation"
-version = "0.1.19"
+version = "0.1.20"
 description = "Free, offline-first, cross-platform voice dictation — speak anywhere, get text at your cursor."
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,6 +23,7 @@ classifiers = [
 # Core runtime deps. The local engine pulls faster-whisper; cloud-only users
 # can skip it but it's small enough to keep as default.
 dependencies = [
+    "certifi>=2024.2.2",
     "numpy>=1.21",
     "sounddevice>=0.4.6",
     "pynput>=1.7.6",
@@ -44,8 +45,8 @@ full = ["pyperclip>=1.8", "pillow>=9.0", "rumps>=0.4.0; sys_platform == 'darwin'
 yap = "yap.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yap-dictation/yap"
-Issues = "https://github.com/yap-dictation/yap/issues"
+Homepage = "https://github.com/AkuchiS/Yap"
+Issues = "https://github.com/AkuchiS/Yap/issues"
 
 [tool.setuptools.packages.find]
 include = ["yap*"]

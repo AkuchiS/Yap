@@ -4,16 +4,16 @@ No telemetry: this makes one outbound call to the *public* GitHub Releases API,
 and only when you run `yap update` or launch the menu-bar app — and then at most
 once a day (cached next to your config). Nothing about you is sent.
 
-Applying an update is still a manual download for now: each unsigned build of the
-macOS app needs its permissions re-granted, so a genuine one-click in-place
-updater waits on Apple Developer signing. The plumbing here (check + "how to
-update" + the menu-bar notice) is ready for that day — `apply()` just opens the
-download page until a signed build can swap itself in place safely.
+Tagged macOS releases are Developer-ID signed and notarized. Applying an update
+is still a manual download for now because yap does not yet replace its own app
+bundle. The plumbing here (check + menu-bar notice + download link) keeps users
+informed without giving the app permission to rewrite itself.
 """
 
 from __future__ import annotations
 
 import json
+import ssl
 import time
 import urllib.request
 from typing import Any, Callable, Optional
@@ -51,7 +51,15 @@ def _fetch_latest(timeout: float = 4.0) -> Optional[dict]:
         "User-Agent": f"yap/{__version__}",
     })
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        # Frozen Python apps do not reliably discover the macOS system CA store.
+        # certifi is bundled explicitly so the signed app can reach GitHub rather
+        # than misreporting a TLS failure as "offline".
+        try:
+            import certifi
+            context = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            context = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=timeout, context=context) as r:
             return json.load(r)
     except Exception:
         return None
@@ -120,10 +128,9 @@ def instructions(info: dict) -> str:
 def apply(info: dict) -> bool:
     """Open the download page for the new version.
 
-    This is the seam for a future one-click updater: once the app is Apple-signed
-    (stable identity → permissions survive an update), this can download the new
-    build and swap it in place without a re-grant. Until then, opening the page is
-    the safe, honest action.
+    Tagged builds have a stable signed identity, but yap deliberately does not
+    install executable code in-place yet. Opening the release page is the safe,
+    honest action until a verified updater is implemented.
     """
     try:
         import webbrowser
