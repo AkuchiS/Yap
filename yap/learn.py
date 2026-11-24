@@ -113,6 +113,18 @@ def extract_candidates(text: str) -> list[str]:
     return out
 
 
+# A learned word this similar to one of YOUR vocabulary words is almost certainly
+# Whisper mishearing it ("Akutchess" for AkuchiS, "Jazz" for Jaz). Learning it
+# would feed the wrong spelling back into the prompt and lock the mistake in.
+_NEAR_MISS = 0.72
+
+
+def _near_miss(word: str, manual: "set[str]") -> bool:
+    w = word.lower()
+    return any(w != m and difflib.SequenceMatcher(None, w, m).ratio() >= _NEAR_MISS
+               for m in manual)
+
+
 class VocabLearner:
     def __init__(self, cfg: dict[str, Any]):
         lc = cfg.get("learning", {}) or {}
@@ -120,14 +132,21 @@ class VocabLearner:
         self.min_count = int(lc.get("min_count", 3))
         self.max_words = int(lc.get("max_words", 80))
         self.path = config_dir() / "learned.json"
+        # How often each candidate also turns up in plain lowercase. A word you say
+        # lowercase as often as capitalised ("more", "new", "everything") is an
+        # ordinary word Whisper happened to capitalise — not a name. Kept in its own
+        # file so older yap versions can still read learned.json.
+        self.lower_path = config_dir() / "learned_lower.json"
         self._manual = {str(w).lower() for w in cfg.get("vocabulary", []) if str(w).strip()}
-        self._counts: dict[str, int] = self._load()
+        self._counts: dict[str, int] = self._load(self.path)
+        self._lower: dict[str, int] = self._load(self.lower_path)
         self._promoted = self._compute_promoted()
 
-    def _load(self) -> dict[str, int]:
+    @staticmethod
+    def _load(path) -> dict[str, int]:
         try:
-            if self.path.exists():
-                data = json.loads(self.path.read_text(encoding="utf-8"))
+            if path.exists():
+                data = json.loads(path.read_text(encoding="utf-8"))
                 return {str(k): int(v) for k, v in data.items()}
         except Exception:
             pass
@@ -137,12 +156,21 @@ class VocabLearner:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(json.dumps(self._counts, indent=2), encoding="utf-8")
+            self.lower_path.write_text(json.dumps(self._lower, indent=2), encoding="utf-8")
         except Exception:
             pass
 
+    def _eligible(self, w: str, c: int) -> bool:
+        lw = w.lower()
+        return (c >= self.min_count
+                and lw not in self._manual
+                # names are almost never said in lowercase (Hermes 124:0, Mac 104:0);
+                # ordinary words are, a lot (More 70:40). Allow a little noise.
+                and self._lower.get(lw, 0) * 4 < c
+                and not _near_miss(w, self._manual))
+
     def _compute_promoted(self) -> list[str]:
-        eligible = [(w, c) for w, c in self._counts.items()
-                    if c >= self.min_count and w.lower() not in self._manual]
+        eligible = [(w, c) for w, c in self._counts.items() if self._eligible(w, c)]
         # most frequent first, capped
         eligible.sort(key=lambda wc: (-wc[1], wc[0]))
         return [w for w, _ in eligible[: self.max_words]]
@@ -156,9 +184,19 @@ class VocabLearner:
             if w.lower() in self._manual:
                 continue
             self._counts[w] = self._counts.get(w, 0) + 1
+        known = {k.lower() for k in self._counts}
+        for m in _WORD.finditer(text):
+            tok = m.group(0)
+            if tok.islower() and tok in known:   # only track words we're weighing
+                self._lower[tok] = self._lower.get(tok, 0) + 1
         self._promoted = self._compute_promoted()
         self._save()
         return [w for w in self._promoted if w not in before]
+
+    def casing_words(self) -> list[str]:
+        """Learned terms safe to force-case everywhere: CamelCase only (GitHub,
+        iPhone). Plain capitalised or all-caps words are not ("More", "IT")."""
+        return [w for w in self._promoted if _CAMEL.search(w)]
 
     def words(self) -> list[str]:
         """The current learned glossary (promoted words)."""

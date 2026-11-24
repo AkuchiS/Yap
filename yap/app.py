@@ -166,6 +166,12 @@ class App:
         self._log(f"● listening…{app_note}", 1)
 
     def on_stop(self):
+        # Only finish a recording that actually started. If the key went down while
+        # the previous utterance was still transcribing, on_start bailed out without
+        # taking the lock — finishing here would re-transcribe and re-paste the
+        # PREVIOUS audio, then release a lock we never held.
+        if not self._recording:
+            return
         self._recording = False
         self._stop_event.set()
         self._status("transcribing")
@@ -232,7 +238,11 @@ class App:
             text = self.engine.transcribe_array(audio, self.samplerate)
             text = cleanup.maybe_clean(text, eff)
             text = apply_replacements(text, eff.get("replacements"))
-            text = normalize_case(text, vocab)  # force your vocab's casing (akuchis -> AkuchiS)
+            # Force casing only from words you chose (akuchis -> AkuchiS) plus learned
+            # CamelCase terms (github -> GitHub). Never from other learned words: a
+            # learned "More" or "New" would capitalise every ordinary "more"/"new".
+            text = normalize_case(text, list(eff.get("vocabulary", []))
+                                  + self.learner.casing_words())
             dt = time.time() - t0
             if not text:
                 self._log("… no speech detected — try speaking louder/closer", 1)
