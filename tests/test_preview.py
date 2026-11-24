@@ -174,12 +174,21 @@ def test_bubble_on_other_display_stays_on_that_display():
     assert 3440 <= x and x + 600 <= 3440 + 2160
 
 
-def test_tall_field_puts_bubble_inside_its_bottom():
+def test_tall_field_is_treated_as_a_page_not_an_input():
+    from yap.bubble import place
+
+    # Claude reported its whole chat area (input box sits at its bottom edge)
+    area = (100, 63, 1600, 1200)
+    x, y = place("field", area, 500, 60, _SCREENS)
+    assert y > 63 + 300                       # well clear of the bottom input box
+    assert x == 100 + (1600 - 500) / 2
+
+
+def test_short_field_near_screen_bottom_goes_above_it():
     from yap.bubble import place, _GAP
 
-    # a full-height editor: no room above or below
-    x, y = place("field", (100, 63, 1600, 1347), 500, 60, _SCREENS)
-    assert y == 63 + _GAP or y == 63 + 8
+    x, y = place("field", (300, 80, 900, 44), 500, 60, _SCREENS)
+    assert y == 80 + 44 + _GAP
 
 
 def test_no_anchor_falls_back_to_screen_under_mouse():
@@ -189,11 +198,11 @@ def test_no_anchor_falls_back_to_screen_under_mouse():
     assert (x, y) == ((3440 - 600) / 2, 1440 + _BOTTOM_GAP)   # the upper display
 
 
-def test_window_anchor_is_bottom_centre_of_window():
+def test_window_anchor_avoids_bottom_input():
     from yap.bubble import place
 
     x, y = place("window", (200, 300, 1000, 800), 400, 60, _SCREENS)
-    assert (x, y) == (200 + 300, 360)
+    assert (x, y) == (200 + 300, 300 + 800 * 0.55 - 30)   # not on the bottom input
 
 
 def test_focus_anchor_never_raises():

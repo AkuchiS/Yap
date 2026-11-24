@@ -60,13 +60,18 @@ def _screen_for(screens, x, y):
     return screens[0]
 
 
+_TALL = 220   # a focused "text box" taller than this is really a page/chat area
+
+
 def place(kind: Optional[str], anchor, w: float, h: float, screens, mouse=(0, 0)):
     """Where the bubble's bottom-left corner goes.
 
     kind/anchor come from the focused app via Accessibility:
       "caret"  -> just under the text cursor (above it if that runs off-screen)
-      "field"  -> just under the text box, else above it, else inside its bottom
-      "window" -> bottom-centre inside the focused window
+      "field"  -> just under a normal text box, else just above it
+      "window" or a tall "field" (a whole page/chat area, as Electron apps often
+               report) -> centred a little above the middle of that area, so it
+               never sits on the input box that chat apps keep at the bottom
       None     -> bottom-centre of the screen under the mouse (old behaviour)
     `screens` = visible frames, primary first. Always clamped on-screen.
     """
@@ -76,15 +81,14 @@ def place(kind: Optional[str], anchor, w: float, h: float, screens, mouse=(0, 0)
     ax, ay, aw, ah = anchor
     vf = _screen_for(screens, ax + min(aw, 40) / 2.0, ay + ah / 2.0)
     bottom, top = vf[1], vf[1] + vf[3]
-    if kind == "window":
-        x, y = ax + (aw - w) / 2.0, ay + 60
+    area = kind == "window" or (kind == "field" and ah > _TALL)
+    if area:
+        x, y = ax + (aw - w) / 2.0, ay + ah * 0.55 - h / 2.0
     else:
         x = ax - (12 if kind == "caret" else 0)
         y = ay - h - _GAP                       # below
-        if y < bottom:
-            y = ay + ah + _GAP                  # above
-        if y + h > top:
-            y = ay + _GAP                       # tall field: inside its bottom edge
+        if y < bottom + 8:
+            y = ay + ah + _GAP                  # no room below: above
     x = min(max(x, vf[0] + 8), vf[0] + vf[2] - w - 8)
     y = min(max(y, bottom + 8), top - h - 8)
     return x, y
@@ -104,11 +108,32 @@ def _ax_rect(el, attr_pos="AXPosition", attr_size="AXSize"):
     return (p.x, p.y, z.width, z.height)
 
 
+_AX_ENABLED: set = set()   # app pids we've asked to expose their accessibility tree
+
+
+def _enable_app_ax(appel) -> bool:
+    """Electron apps (Claude, ChatGPT, Slack, VS Code…) don't publish where the
+    text cursor is unless asked: setting AXManualAccessibility on the app turns
+    their accessibility tree on. Harmless for other apps (they ignore it). Done
+    once per app process. Returns True if we just switched it on."""
+    from ApplicationServices import AXUIElementGetPid, AXUIElementSetAttributeValue
+    try:
+        err, pid = AXUIElementGetPid(appel, None)
+        if err or pid in _AX_ENABLED:
+            return False
+        _AX_ENABLED.add(pid)
+        AXUIElementSetAttributeValue(appel, "AXManualAccessibility", True)
+        return True
+    except Exception:
+        return False
+
+
 def focus_anchor():
     """Ask the focused app (via Accessibility, which Yap already has for pasting)
-    where you're typing. Returns (kind, rect) in Cocoa coordinates, or (None, None).
-    Native apps usually report the caret; browsers/Electron often only the field."""
+    where you're typing. Returns (kind, rect) in Cocoa coordinates, or (None, None)."""
     try:
+        import time
+
         from AppKit import NSScreen
         from ApplicationServices import (AXUIElementCopyAttributeValue,
                                          AXUIElementCopyParameterizedAttributeValue,
@@ -122,8 +147,16 @@ def focus_anchor():
         def flip(r):  # AX: top-left origin, y down -> Cocoa: bottom-left, y up
             return (r[0], primary_h - r[1] - r[3], r[2], r[3])
 
-        err, el = AXUIElementCopyAttributeValue(sysw, "AXFocusedUIElement", None)
-        if not err and el is not None:
+        err, appel = AXUIElementCopyAttributeValue(sysw, "AXFocusedApplication", None)
+        if err or appel is None:
+            return None, None
+        AXUIElementSetMessagingTimeout(appel, 0.25)
+        just_enabled = _enable_app_ax(appel)
+
+        def caret_or_field():
+            err, el = AXUIElementCopyAttributeValue(appel, "AXFocusedUIElement", None)
+            if err or el is None:
+                return None, None
             err, rng = AXUIElementCopyAttributeValue(el, "AXSelectedTextRange", None)
             if not err and rng is not None:
                 err, b = AXUIElementCopyParameterizedAttributeValue(
@@ -134,15 +167,19 @@ def focus_anchor():
                         return "caret", flip((r.origin.x, r.origin.y,
                                               max(r.size.width, 1.0), r.size.height))
             field = _ax_rect(el)
-            if field:
-                return "field", flip(field)
-        err, appel = AXUIElementCopyAttributeValue(sysw, "AXFocusedApplication", None)
-        if not err and appel is not None:
-            err, win = AXUIElementCopyAttributeValue(appel, "AXFocusedWindow", None)
-            if not err and win is not None:
-                wr = _ax_rect(win)
-                if wr:
-                    return "window", flip(wr)
+            return ("field", flip(field)) if field else (None, None)
+
+        kind, rect = caret_or_field()
+        if just_enabled and kind != "caret":
+            time.sleep(0.15)            # Electron builds its tree on demand: retry once
+            kind, rect = caret_or_field()
+        if kind:
+            return kind, rect
+        err, win = AXUIElementCopyAttributeValue(appel, "AXFocusedWindow", None)
+        if not err and win is not None:
+            wr = _ax_rect(win)
+            if wr:
+                return "window", flip(wr)
     except Exception:
         pass
     return None, None
@@ -194,11 +231,11 @@ class Bubble:
         """Key just went down: find where you're typing, then show a quiet
         placeholder there until words arrive."""
         self._anchor = focus_anchor()
-        kind = self._anchor[0] or "screen"
-        if kind != self._last_kind:          # log only when the method changes
-            import sys
-            print(f"yap: bubble placed by {kind}", file=sys.stderr)
-            self._last_kind = kind
+        kind, rect = self._anchor
+        if kind == "field" and rect and rect[3] > _TALL:
+            kind = "field (tall: treated as page)"
+        import sys
+        print(f"yap: bubble placed by {kind or 'screen'}", file=sys.stderr)
         self._set("Listening…", muted=True)
 
     def text(self, words: str) -> None:
