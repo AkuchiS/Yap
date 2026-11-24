@@ -247,6 +247,9 @@ def run(cfg: dict[str, Any]) -> int:
                 app = App(cfg)
                 app.status_cb = lambda st: self._main(lambda: self._reflect(st))
                 app.notify_cb = lambda m: self._main(lambda: self._notify(m))
+                # As-you-speak bubble (built lazily on the main thread).
+                app.preview_cb = lambda t: self._main(lambda: self._preview(t))
+                self._bubble_on = app._preview_enabled()
                 # Warm the model + bring up the control socket, but NOT the pynput
                 # listener — the main-thread Quartz tap above owns key capture.
                 app.start_background(use_global_hotkey=False)
@@ -261,6 +264,31 @@ def run(cfg: dict[str, Any]) -> int:
 
         def _reflect(self, state):
             self.title = _GLYPH.get(state, _GLYPH["idle"])
+            b = self._get_bubble()
+            if b is None:
+                return
+            if state == "listening":
+                b.listening()
+            elif state == "transcribing":
+                b.finishing()
+            else:  # idle: leave the pasted words up a moment, then go
+                b.hide(after=0.7)
+
+        # -- live preview bubble (main thread) ------------------------------
+        def _get_bubble(self):
+            if not getattr(self, "_bubble_on", False):
+                return None
+            if getattr(self, "_bubble", None) is None:
+                from . import bubble
+                self._bubble = bubble.create()
+                if self._bubble is None:
+                    self._bubble_on = False
+            return self._bubble
+
+        def _preview(self, text):
+            b = self._get_bubble()
+            if b is not None:
+                b.text(text)
 
         # -- menu actions ----------------------------------------------------
         def _toggle(self, _sender):

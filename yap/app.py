@@ -46,6 +46,10 @@ class App:
         self.status_cb = None
         # Optional GUI notifier for one-off messages (e.g. "Learned: DIME").
         self.notify_cb = None
+        # Optional live-preview sink (the menu-bar bubble): called with the words so
+        # far while you're still speaking, then once with the final text.
+        self.preview_cb = None
+        self._take = 0                 # bumps every recording; stale previews check it
 
         self._stop_event = threading.Event()
         self._record_thread: Optional[threading.Thread] = None
@@ -152,6 +156,8 @@ class App:
             return  # previous transcription still running; ignore
         self._stop_event.clear()
         self._audio = None
+        self.recorder.reset_live()
+        self._take += 1
 
         def _rec():
             self._audio = self.recorder.record_until(self._stop_event)
@@ -162,6 +168,9 @@ class App:
         # tell other voice apps: pause — and remember which app we're dictating into
         self._active_app = self.integration.record_started()
         self._status("listening")
+        if self._preview_enabled():
+            threading.Thread(target=self._preview_loop, args=(self._take,),
+                             daemon=True).start()
         app_note = f" → {self._active_app}" if self._active_app else ""
         self._log(f"● listening…{app_note}", 1)
 
@@ -178,6 +187,62 @@ class App:
         self._log("◼ processing…", 2)
         # process off the hotkey thread so the listener stays responsive
         threading.Thread(target=self._finish, daemon=True).start()
+
+    # ---- live preview -------------------------------------------------------
+    def _preview_enabled(self) -> bool:
+        """Only with a GUI to show it, and only for the LOCAL engine: previewing
+        through a cloud engine would upload audio twice a second (cost + privacy)."""
+        pv = self.cfg.get("preview") or {}
+        return (self.preview_cb is not None and bool(pv.get("enabled", True))
+                and getattr(self.engine, "name", "") == "local")
+
+    def _show_preview(self, text: str) -> None:
+        if self.preview_cb:
+            try:
+                self.preview_cb(text)
+            except Exception:
+                pass
+
+    def _polish(self, text: str, eff: dict) -> str:
+        """Cheap, deterministic fix-ups shared by preview and final text."""
+        text = apply_replacements(text, eff.get("replacements"))
+        return normalize_case(text, list(eff.get("vocabulary", []))
+                              + self.learner.casing_words())
+
+    def _preview_loop(self, take: int) -> None:
+        """While the key is held, re-transcribe the take so far and push the words
+        to the bubble. Whisper decodes a whole window in ~0.5 s no matter how
+        short the clip, so this refreshes roughly twice a second. The FINAL text
+        is still a separate full-accuracy pass over all the audio on release."""
+        pv = self.cfg.get("preview") or {}
+        interval = float(pv.get("interval", 0.15))
+        window = float(pv.get("window_seconds", 25))   # Whisper sees 30 s at most
+        sr = self.samplerate
+        eff = config.profile_for(self.cfg, getattr(self, "_active_app", None))
+        last_secs = 0.0
+        time.sleep(0.35)  # let the first audio arrive
+        while self._recording and self._take == take:
+            secs = self.recorder.live_seconds()
+            if secs < 0.5 or secs - last_secs < 0.3:   # nothing new worth decoding
+                time.sleep(0.08)
+                continue
+            last_secs = secs
+            audio = self.recorder.snapshot(last_seconds=window)
+            if audio is None:
+                continue
+            try:
+                text = self.engine.transcribe_array(audio, sr)
+            except Exception as e:
+                self._log(f"yap: preview failed ({e}); final text unaffected", 2)
+                return
+            if not (self._recording and self._take == take):
+                return  # released while decoding: the final pass takes over
+            text = self._polish(text, eff)
+            if secs > window and text:
+                text = "… " + text
+            if text:
+                self._show_preview(text)
+            time.sleep(interval)
 
     def toggle(self):
         """Flip dictation on/off. The entry point for an external trigger — a
@@ -248,6 +313,7 @@ class App:
                 self._log("… no speech detected — try speaking louder/closer", 1)
                 return
             self._log(f'✓ "{text}"', 1)
+            self._show_preview(text)   # the bubble settles on exactly what's pasted
             self._log(f"  ({secs:.1f}s audio, {dt:.1f}s transcribe)", 2)
             self.injector.inject(text)
             self._log("… injected at cursor", 2)

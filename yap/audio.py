@@ -83,8 +83,44 @@ class Recorder:
         self.device = cfg.get("device")  # int, name substring, list, or None
         self.max_seconds = float(cfg.get("max_seconds", 120))
 
+        # Live view of the take in progress, for the as-you-speak preview. The
+        # recording thread appends; snapshot() reads a copy from another thread.
+        self._live: list = []
+        self._live_sr = self.target_sr
+
+    def live_seconds(self) -> float:
+        """Length of the take in progress, in seconds."""
+        return sum(c.shape[0] for c in list(self._live)) / float(self._live_sr or 1)
+
+    def reset_live(self) -> None:
+        """Forget the previous take so the preview never shows stale audio."""
+        self._live = []
+
     def _resolve_device(self):
         return resolve_device(self.device)
+
+    def snapshot(self, last_seconds: Optional[float] = None) -> Optional["np.ndarray"]:
+        """Audio captured so far in the current take (mono float32 at target_sr),
+        optionally only the trailing `last_seconds`. None if nothing yet."""
+        chunks = list(self._live)  # copy: the recorder keeps appending
+        if not chunks:
+            return None
+        sr = self._live_sr
+        if last_seconds:
+            keep, n = int(last_seconds * sr), 0
+            tail = []
+            for c in reversed(chunks):
+                tail.append(c)
+                n += c.shape[0]
+                if n >= keep:
+                    break
+            chunks = tail[::-1]
+        audio = np.concatenate(chunks, axis=0)
+        if audio.ndim > 1:
+            audio = audio.mean(axis=1)
+        if last_seconds:
+            audio = audio[-int(last_seconds * sr):]
+        return _resample(audio.astype(np.float32), sr, self.target_sr)
 
     def _pick_capture_sr(self, device) -> int:
         """The rate to actually open the mic at. Many external-display/dock mics
@@ -118,6 +154,7 @@ class Recorder:
             q.put(indata.copy())
 
         chunks: list[np.ndarray] = []
+        self._live, self._live_sr = chunks, capture_sr   # shared with snapshot()
         max_frames = int(self.max_seconds * capture_sr)
         total = 0
         try:

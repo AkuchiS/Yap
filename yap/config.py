@@ -32,6 +32,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "compute_type": "auto",      # auto | int8 | int8_float16 | float16 | float32
         "language": None,            # None = auto-detect; or "en", "es", ...
         "beam_size": 1,
+        "cpu_threads": "auto",       # auto = min(8, cores-1); CTranslate2's own default is 4
     },
     "cloud": {
         # Groq is a great default: OpenAI-compatible, very fast, generous free tier.
@@ -77,6 +78,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "method": "paste",           # "paste" (clipboard + Ctrl/Cmd+V) | "type"
         "restore_clipboard": True,   # put your old clipboard back after pasting
         "trailing_space": True,      # append a space so words don't run together
+    },
+    # As-you-speak bubble (menu-bar app, local engine only). Shows the words so
+    # far while you hold the key; the final text is still pasted on release.
+    "preview": {
+        "enabled": True,
+        "interval": 0.15,            # pause between refreshes (each decode ~0.5 s)
+        "window_seconds": 25,        # long takes preview only the latest 25 s
     },
     "audio": {
         "samplerate": 16000,         # target rate for the recognizer (Whisper wants 16k)
