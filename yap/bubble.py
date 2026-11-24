@@ -17,7 +17,8 @@ from typing import Optional
 _MAX_WIDTH = 620       # points
 _PAD_X, _PAD_Y = 18, 12
 _MAX_CHARS = 220       # long takes: show the most recent words, not the start
-_BOTTOM_GAP = 96       # distance above the Dock / bottom of the visible area
+_BOTTOM_GAP = 96       # fallback: distance above the bottom of the screen
+_GAP = 10              # space between the text cursor / field and the bubble
 
 # AppKit constants spelled out so this module imports cleanly anywhere.
 _STYLE_BORDERLESS = 0
@@ -42,6 +43,109 @@ def tail_text(text: str, limit: int = _MAX_CHARS) -> str:
     if 0 <= space < 40:
         cut = cut[space + 1:]
     return "… " + cut
+
+
+# ---------------------------------------------------------------- placement ---
+# Rects are (x, y, w, h) in Cocoa screen coordinates (origin bottom-left of the
+# primary display, y up). Kept as plain tuples so the maths is testable anywhere.
+
+def _contains(r, x, y) -> bool:
+    return r[0] <= x < r[0] + r[2] and r[1] <= y < r[1] + r[3]
+
+
+def _screen_for(screens, x, y):
+    for vf in screens:
+        if _contains(vf, x, y):
+            return vf
+    return screens[0]
+
+
+def place(kind: Optional[str], anchor, w: float, h: float, screens, mouse=(0, 0)):
+    """Where the bubble's bottom-left corner goes.
+
+    kind/anchor come from the focused app via Accessibility:
+      "caret"  -> just under the text cursor (above it if that runs off-screen)
+      "field"  -> just under the text box, else above it, else inside its bottom
+      "window" -> bottom-centre inside the focused window
+      None     -> bottom-centre of the screen under the mouse (old behaviour)
+    `screens` = visible frames, primary first. Always clamped on-screen.
+    """
+    if kind is None or anchor is None:
+        vf = _screen_for(screens, *mouse)
+        return vf[0] + (vf[2] - w) / 2.0, vf[1] + _BOTTOM_GAP
+    ax, ay, aw, ah = anchor
+    vf = _screen_for(screens, ax + min(aw, 40) / 2.0, ay + ah / 2.0)
+    bottom, top = vf[1], vf[1] + vf[3]
+    if kind == "window":
+        x, y = ax + (aw - w) / 2.0, ay + 60
+    else:
+        x = ax - (12 if kind == "caret" else 0)
+        y = ay - h - _GAP                       # below
+        if y < bottom:
+            y = ay + ah + _GAP                  # above
+        if y + h > top:
+            y = ay + _GAP                       # tall field: inside its bottom edge
+    x = min(max(x, vf[0] + 8), vf[0] + vf[2] - w - 8)
+    y = min(max(y, bottom + 8), top - h - 8)
+    return x, y
+
+
+def _ax_rect(el, attr_pos="AXPosition", attr_size="AXSize"):
+    from ApplicationServices import (AXUIElementCopyAttributeValue, AXValueGetValue,
+                                     kAXValueCGPointType, kAXValueCGSizeType)
+    e1, pos = AXUIElementCopyAttributeValue(el, attr_pos, None)
+    e2, size = AXUIElementCopyAttributeValue(el, attr_size, None)
+    if e1 or e2 or pos is None or size is None:
+        return None
+    ok1, p = AXValueGetValue(pos, kAXValueCGPointType, None)
+    ok2, z = AXValueGetValue(size, kAXValueCGSizeType, None)
+    if not (ok1 and ok2) or z.width <= 0 or z.height <= 0:
+        return None
+    return (p.x, p.y, z.width, z.height)
+
+
+def focus_anchor():
+    """Ask the focused app (via Accessibility, which Yap already has for pasting)
+    where you're typing. Returns (kind, rect) in Cocoa coordinates, or (None, None).
+    Native apps usually report the caret; browsers/Electron often only the field."""
+    try:
+        from AppKit import NSScreen
+        from ApplicationServices import (AXUIElementCopyAttributeValue,
+                                         AXUIElementCopyParameterizedAttributeValue,
+                                         AXUIElementCreateSystemWide,
+                                         AXUIElementSetMessagingTimeout,
+                                         AXValueGetValue, kAXValueCGRectType)
+        sysw = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(sysw, 0.25)   # never hang on a busy app
+        primary_h = NSScreen.screens()[0].frame().size.height
+
+        def flip(r):  # AX: top-left origin, y down -> Cocoa: bottom-left, y up
+            return (r[0], primary_h - r[1] - r[3], r[2], r[3])
+
+        err, el = AXUIElementCopyAttributeValue(sysw, "AXFocusedUIElement", None)
+        if not err and el is not None:
+            err, rng = AXUIElementCopyAttributeValue(el, "AXSelectedTextRange", None)
+            if not err and rng is not None:
+                err, b = AXUIElementCopyParameterizedAttributeValue(
+                    el, "AXBoundsForRange", rng, None)
+                if not err and b is not None:
+                    ok, r = AXValueGetValue(b, kAXValueCGRectType, None)
+                    if ok and r.size.height > 0 and (r.origin.x or r.origin.y):
+                        return "caret", flip((r.origin.x, r.origin.y,
+                                              max(r.size.width, 1.0), r.size.height))
+            field = _ax_rect(el)
+            if field:
+                return "field", flip(field)
+        err, appel = AXUIElementCopyAttributeValue(sysw, "AXFocusedApplication", None)
+        if not err and appel is not None:
+            err, win = AXUIElementCopyAttributeValue(appel, "AXFocusedWindow", None)
+            if not err and win is not None:
+                wr = _ax_rect(win)
+                if wr:
+                    return "window", flip(wr)
+    except Exception:
+        pass
+    return None, None
 
 
 class Bubble:
@@ -82,10 +186,19 @@ class Bubble:
 
         self._panel, self._bg, self._label = panel, bg, label
         self._hide_token = 0
+        self._anchor = (None, None)   # where you're typing, fixed for the take
+        self._last_kind = "unset"
 
     # -- public (main thread only) ------------------------------------------
     def listening(self) -> None:
-        """Key just went down: show a quiet placeholder until words arrive."""
+        """Key just went down: find where you're typing, then show a quiet
+        placeholder there until words arrive."""
+        self._anchor = focus_anchor()
+        kind = self._anchor[0] or "screen"
+        if kind != self._last_kind:          # log only when the method changes
+            import sys
+            print(f"yap: bubble placed by {kind}", file=sys.stderr)
+            self._last_kind = kind
         self._set("Listening…", muted=True)
 
     def text(self, words: str) -> None:
@@ -128,26 +241,15 @@ class Bubble:
         self._panel.orderFrontRegardless()
 
     def _layout(self, w: float, h: float, fit) -> None:
-        from AppKit import NSMakeRect
+        from AppKit import NSEvent, NSMakeRect, NSScreen
 
-        vf = self._screen_frame()
-        x = vf.origin.x + (vf.size.width - w) / 2.0
-        y = vf.origin.y + _BOTTOM_GAP
+        screens = [(f.origin.x, f.origin.y, f.size.width, f.size.height)
+                   for f in (s.visibleFrame() for s in NSScreen.screens())]
+        m = NSEvent.mouseLocation()
+        x, y = place(self._anchor[0], self._anchor[1], w, h, screens, (m.x, m.y))
         self._panel.setFrame_display_(NSMakeRect(x, y, w, h), True)
         self._bg.setFrame_(NSMakeRect(0, 0, w, h))
         self._label.setFrame_(NSMakeRect(_PAD_X, _PAD_Y, w - 2 * _PAD_X, fit.height))
-
-    @staticmethod
-    def _screen_frame():
-        """Visible frame of the screen under the mouse pointer."""
-        from AppKit import NSEvent, NSScreen
-        from Foundation import NSPointInRect
-
-        loc = NSEvent.mouseLocation()
-        for s in NSScreen.screens():
-            if NSPointInRect(loc, s.frame()):
-                return s.visibleFrame()
-        return NSScreen.mainScreen().visibleFrame()
 
 
 def create() -> Optional[Bubble]:

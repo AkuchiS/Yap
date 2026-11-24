@@ -142,3 +142,62 @@ def test_cpu_threads_setting():
     assert _cpu_threads(None) == _cpu_threads("auto")
     assert _cpu_threads(3) == 3
     assert _cpu_threads("nonsense") == _cpu_threads("auto")
+
+
+# ---- bubble placement (pure maths; Jay's real 4-display layout) -------------
+_SCREENS = [(0, 63, 3440, 1347),          # main ultrawide (primary)
+            (-2160, -240, 2160, 3840),    # portrait, left
+            (3440, -320, 2160, 3840),     # portrait, right
+            (0, 1440, 3440, 1440)]        # ultrawide above
+
+
+def test_bubble_goes_just_under_the_caret():
+    from yap.bubble import place, _GAP
+
+    x, y = place("caret", (800, 700, 2, 20), 400, 60, _SCREENS)
+    assert x == 788 and y == 700 - 60 - _GAP
+
+
+def test_bubble_flips_above_caret_near_screen_bottom():
+    from yap.bubble import place, _GAP
+
+    x, y = place("caret", (800, 90, 2, 20), 400, 60, _SCREENS)
+    assert y == 90 + 20 + _GAP                # no room below → above the line
+
+
+def test_bubble_on_other_display_stays_on_that_display():
+    from yap.bubble import place
+
+    x, y = place("caret", (-300, 2500, 2, 20), 600, 60, _SCREENS)
+    assert -2160 <= x and x + 600 <= 0        # clamped inside the left portrait
+    x, y = place("field", (5500, 100, 90, 30), 600, 60, _SCREENS)
+    assert 3440 <= x and x + 600 <= 3440 + 2160
+
+
+def test_tall_field_puts_bubble_inside_its_bottom():
+    from yap.bubble import place, _GAP
+
+    # a full-height editor: no room above or below
+    x, y = place("field", (100, 63, 1600, 1347), 500, 60, _SCREENS)
+    assert y == 63 + _GAP or y == 63 + 8
+
+
+def test_no_anchor_falls_back_to_screen_under_mouse():
+    from yap.bubble import place, _BOTTOM_GAP
+
+    x, y = place(None, None, 600, 60, _SCREENS, mouse=(1000, 2000))
+    assert (x, y) == ((3440 - 600) / 2, 1440 + _BOTTOM_GAP)   # the upper display
+
+
+def test_window_anchor_is_bottom_centre_of_window():
+    from yap.bubble import place
+
+    x, y = place("window", (200, 300, 1000, 800), 400, 60, _SCREENS)
+    assert (x, y) == (200 + 300, 360)
+
+
+def test_focus_anchor_never_raises():
+    from yap.bubble import focus_anchor
+
+    kind, rect = focus_anchor()          # untrusted test process → graceful
+    assert kind in (None, "caret", "field", "window")
