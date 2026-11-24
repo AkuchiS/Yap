@@ -4,6 +4,8 @@ __pycache__/
 build/
 dist/
 .build-venv/
+.build-python/
+.uv-cache/
 .venv/
 venv/
 .env

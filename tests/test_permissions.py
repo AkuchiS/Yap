@@ -49,6 +49,13 @@ def test_panes_point_at_the_right_apple_anchors():
     assert by["accessibility"].endswith("Privacy_Accessibility")
 
 
+def test_accessibility_setting_name_matches_macos_release():
+    assert permissions.accessibility_system_name("26.0") == "Accessibility"
+    assert permissions.accessibility_system_name("27.0") == "Device Control and Data Access"
+    if IS_MAC:
+        assert permissions.PERMISSIONS[2]["system_name"] == permissions.accessibility_system_name()
+
+
 def test_wording_is_plain_english_but_still_names_the_apple_setting():
     for p in permissions.PERMISSIONS:
         assert p["label"] and p["why"] and p["system_name"]
@@ -111,7 +118,8 @@ def test_first_run_is_needed_when_something_is_missing():
 
 def test_first_run_never_raises_and_reports_failure_off_mac():
     # A broken setup window must never take the menu-bar app down with it.
-    assert first_run.run(lambda *_a: None) is False
+    if not IS_MAC:
+        assert first_run.run(lambda *_a: None) is False
 
 
 def test_request_microphone_is_safe_off_mac():

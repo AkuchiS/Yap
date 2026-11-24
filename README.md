@@ -342,7 +342,7 @@ app bundles its own interpreter + the Whisper stack.
 ```bash
 yap icon ~/Downloads/yap-icon.png        # (optional) your icon first
 
-# macOS  → ~/Applications/yap.app
+# macOS  → dist/Yap.app (local candidate; installed app stays intact)
 ./packaging/build_macos.sh
 
 # Linux  → dist/yap/  (sudo apt install libportaudio2 for the mic)
@@ -356,6 +356,8 @@ Tips: set `YAP_BUILD_PY=python3.12` to freeze with a specific (mature) Python;
 `YAP_MENUBAR_ONLY=1` hides the macOS Dock icon. After building on macOS, open the
 app and grant **yap** Microphone + Accessibility + Input Monitoring — now shown
 under the yap name and icon. Verify any build with `yap selftest`.
+For a distributable macOS app, use the Developer ID signing and notarization
+workflow in [RELEASE.md](RELEASE.md).
 
 ### Quick wrapper app (no freeze)
 
@@ -392,10 +394,13 @@ Monitoring** (to see your hotkey), and **Accessibility** (to type at your
 cursor). The current app opens a guided setup on first launch. If a permission
 still shows as missing, add yap **by hand**:
 
+On macOS 27, **Accessibility** is shown as **Device Control and Data Access**.
+
 1. In System Settings → Privacy & Security → **Microphone**, turn **Yap** on.
 2. Go to **Input Monitoring** → click **`+`** →
    press **⌘⇧G**, enter `/Applications/Yap.app`, **Add**, toggle it **on**.
-3. Do the same under **Accessibility**.
+3. Do the same under **Device Control and Data Access** on macOS 27, or
+   **Accessibility** on earlier macOS releases.
 4. **Quit Yap fully and reopen it** — grants only take effect on relaunch.
 
 Running the CLI (`yap run`) from a terminal instead of the app? Grant **your

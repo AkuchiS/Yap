@@ -10,7 +10,19 @@ labels/panes/ordering are unit-testable on any box.
 """
 from __future__ import annotations
 
+import platform
 import sys
+
+
+def accessibility_system_name(mac_version: str | None = None) -> str:
+    """Name of the Accessibility trust pane in the running macOS release."""
+    if mac_version is None:
+        mac_version = platform.mac_ver()[0] if sys.platform == "darwin" else ""
+    try:
+        major = int(mac_version.split(".", 1)[0])
+    except ValueError:
+        major = 0
+    return "Device Control and Data Access" if major >= 27 else "Accessibility"
 
 # The three grants yap needs, in the order we ask for them. Deliberately phrased the
 # way a person thinks about it ("see your hotkey"), with Apple's official name kept
@@ -35,7 +47,7 @@ PERMISSIONS = [
     {
         "key": "accessibility",
         "label": "Type at your cursor",
-        "system_name": "Accessibility",
+        "system_name": accessibility_system_name(),
         "why": "so your words land in whatever app you're using",
         "pane": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
         "prompts": False,

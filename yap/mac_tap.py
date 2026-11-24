@@ -205,8 +205,10 @@ class MacTap:
             mask, self._cb, None)
         if not tap:
             # CGEventTapCreate returns NULL when the process lacks the grant.
+            from .permissions import accessibility_system_name
             self.error = ("couldn't create the keyboard tap — grant Yap "
-                          "Accessibility AND Input Monitoring, then reopen Yap")
+                          f"{accessibility_system_name()} AND Input Monitoring, "
+                          "then reopen Yap")
             return self
         self._tap = tap
         self._source = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)

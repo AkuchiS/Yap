@@ -166,7 +166,9 @@ def build(cfg: dict, dest_dir: str, login: bool = False,
         print(f"  login  : will start at login ({login_plist})")
     print("\nNext:")
     print("  1. Open it once: open", str(app).replace(" ", r"\ "))
-    print("  2. Grant the NEW 'yap' app Microphone + Accessibility + Input Monitoring")
+    from .permissions import accessibility_system_name
+    print(f"  2. Grant the NEW 'yap' app Microphone + {accessibility_system_name()}"
+          " + Input Monitoring")
     print("     in System Settings → Privacy & Security (separate from Terminal).")
     print("  3. Optionally drag yap.app into your Applications folder.")
     return app

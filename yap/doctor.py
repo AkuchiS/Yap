@@ -50,9 +50,10 @@ def check_trust(prompt: bool = False):
     if trusted:
         print("  ✓ TRUSTED — this process may monitor input and synthesize keys.")
     else:
+        from .permissions import accessibility_system_name
         print("  ✗ NOT TRUSTED — macOS is blocking key monitoring for this process.")
         print("    Whatever app is shown below must be ON in BOTH")
-        print("    Privacy & Security → Accessibility AND → Input Monitoring,")
+        print(f"    Privacy & Security → {accessibility_system_name()} AND → Input Monitoring,")
         print("    then FULLY QUIT (Cmd+Q) and reopen that app.")
     return trusted
 
@@ -60,8 +61,10 @@ def check_trust(prompt: bool = False):
 def _no_key_hint() -> None:
     """Platform-appropriate advice when the hotkey listener saw no key events (non-Wayland)."""
     if sys.platform == "darwin":
+        from .permissions import accessibility_system_name
         print("    → a trust/permission problem, not a key-choice problem. Add the app you ran")
-        print("    this from to Accessibility AND Input Monitoring above, then Cmd+Q and reopen.")
+        print(f"    this from to {accessibility_system_name()} AND Input Monitoring above,"
+              " then Cmd+Q and reopen.")
     elif sys.platform.startswith("win"):
         print("    → on Windows there's no Accessibility gate. Usually another app is grabbing the")
         print("    key, or a fullscreen/elevated app is stealing input. Try a different hotkey")
@@ -170,7 +173,8 @@ def run(cfg: dict[str, Any], prompt: bool, seconds: int) -> int:
     print(f"  engine : {cfg.get('engine')}   hotkey: {cfg['hotkey']['combo']} "
           f"({cfg['hotkey']['mode']})")
 
-    _hr("1. Accessibility / Input-Monitoring trust (macOS)")
+    from .permissions import accessibility_system_name
+    _hr(f"1. {accessibility_system_name()} / Input Monitoring trust (macOS)")
     check_trust(prompt=prompt)
 
     _hr("2. Hotkey capture")
@@ -192,7 +196,7 @@ def run(cfg: dict[str, Any], prompt: bool, seconds: int) -> int:
 
     if sys.platform == "darwin":
         print("\nDone. The #1 fix when section 2 saw no keys: add the app you ran this from to")
-        print("Accessibility AND Input Monitoring, then Cmd+Q and reopen it.")
+        print(f"{accessibility_system_name()} AND Input Monitoring, then Cmd+Q and reopen it.")
         print("Tip: `yap doctor --prompt` pops the macOS 'allow control' dialog for you.")
     else:
         print("\nDone. If section 2 saw no keys (and you're not on Wayland), another app is likely")

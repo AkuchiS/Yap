@@ -221,9 +221,10 @@ def run(cfg: dict[str, Any]) -> int:
                                      on_stop=self._hk_stop,
                                      on_relearn=self._hk_relearn)
             if not getattr(self.tap, "ok", False):
+                from .permissions import accessibility_system_name
                 self.status_item.title = (
-                    "Grant Yap Accessibility + Input Monitoring in System "
-                    "Settings, then reopen Yap")
+                    f"Grant Yap {accessibility_system_name()} + Input Monitoring "
+                    "in System Settings, then reopen Yap")
                 why = getattr(self.tap, "error", None)
                 if why:
                     print(f"yap: key tap not active: {why}", file=sys.stderr)

@@ -11,14 +11,18 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# 1. Pick a mature Python to freeze with (3.14 is brand new; prefer 3.12/3.11).
+# 1. Pick a Python with current PyObjC wheels. macOS's Xcode Python 3.9 can
+#    select an old PyObjC source build that fails with recent Xcode.
 PY="${YAP_BUILD_PY:-}"
 if [ -z "$PY" ]; then
-  for c in python3.12 python3.11 python3.13 python3.10 python3; do
+  for c in python3.12 "$HOME/.local/bin/python3.12" python3.11 python3.13; do
     command -v "$c" >/dev/null 2>&1 && { PY="$c"; break; }
   done
 fi
-[ -n "$PY" ] || { echo "No python found. brew install python@3.12" >&2; exit 1; }
+[ -n "$PY" ] || { echo "Python 3.11–3.13 needed to build. Install Python 3.12 or set YAP_BUILD_PY." >&2; exit 1; }
+"$PY" -c 'import sys; raise SystemExit(not ((3, 11) <= sys.version_info[:2] < (3, 14)))' || {
+  echo "YAP_BUILD_PY must be Python 3.11–3.13 for the macOS build." >&2; exit 1;
+}
 echo "==> freezing with $("$PY" --version) ($PY)"
 
 # 2. Clean, isolated build venv.
@@ -73,36 +77,18 @@ else
   echo "==> no icon at '$ICON_SRC' (pass one: ./packaging/build_macos.sh path/to/icon.png); building without"
 fi
 
-# 4. Clean up any earlier installs so you don't end up with duplicate menu-bar
-#    icons or a stale login agent launching an old copy.
-echo "==> cleaning up previous installs…"
-launchctl unload "$HOME/Library/LaunchAgents/com.yap.dictation.plist" 2>/dev/null || true
-rm -f "$HOME/Library/LaunchAgents/com.yap.dictation.plist"
-pkill -f "Applications/[Yy]ap.app" 2>/dev/null || true
-rm -rf "$HOME/Applications/yap.app" "$HOME/Applications/Yap.app" \
-       "/Applications/yap.app" "/Applications/Yap.app" 2>/dev/null || true
-
-# 5. Freeze.
+# 4. Freeze into dist without touching an installed, signed copy.
 rm -rf build dist
 echo "==> running PyInstaller…"
 pyinstaller packaging/yap.spec --noconfirm
 
-# 6. Ad-hoc sign so the app's OWN bundled binary is the permission identity.
-codesign --force --deep --sign - dist/Yap.app 2>/dev/null || \
-  echo "   (codesign skipped — app still runs)"
-
-# 7. Install into /Applications (the one Finder's sidebar + Launchpad show) if we
-#    can write there; otherwise fall back to ~/Applications.
-if cp -R dist/Yap.app /Applications/ 2>/dev/null; then
-  DEST="/Applications"
-else
-  DEST="$HOME/Applications"; mkdir -p "$DEST"
-  rm -rf "$DEST/Yap.app"; cp -R dist/Yap.app "$DEST/"
-  echo "   (couldn't write to /Applications — installed to ~/Applications;"
-  echo "    drag Yap.app to /Applications to put it in the main Applications folder)"
-fi
+# 5. Sign the local candidate with the microphone entitlement. A public release
+#    needs the Developer ID + notarization steps in .github/workflows/release.yml.
+codesign --force --deep --options runtime \
+  --entitlements packaging/entitlements.plist --sign - dist/Yap.app
+codesign --verify --deep --strict dist/Yap.app
 deactivate || true
 echo
-echo "✓ built $DEST/Yap.app"
-echo "Next: open it (double-click in Finder, or 'open $DEST/Yap.app'), then grant"
-echo "'Yap' Microphone + Accessibility + Input Monitoring in Privacy & Security."
+echo "✓ built $ROOT/dist/Yap.app (ad-hoc signed local candidate)"
+echo "The installed app was left intact. Use the signed, notarized release workflow"
+echo "before replacing /Applications/Yap.app or distributing a download."

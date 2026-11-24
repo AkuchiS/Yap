@@ -40,7 +40,11 @@ workflow** (produces the three zips as downloadable artifacts, no Release).
 
 Build locally for the OS you're on:
 ```bash
-./packaging/build_macos.sh         # → /Applications/Yap.app
+./packaging/build_macos.sh         # → dist/Yap.app (local candidate only)
 ./packaging/build_linux.sh         # → dist/yap/
 powershell -ExecutionPolicy Bypass -File .\packaging\build_windows.ps1   # → dist\yap\yap.exe
 ```
+
+The macOS helper leaves any installed app intact. Its ad-hoc signature is for
+local testing; use the Developer ID signing and notarization workflow above for
+an installable release download.
