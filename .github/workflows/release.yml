@@ -76,6 +76,10 @@ jobs:
             codesign --force --deep --sign - dist/Yap.app || true
           fi
       - name: Notarize + staple — only if notary secrets present
+        # Manual (non-tag) builds still produce the signed app if Apple's notary service
+        # refuses (e.g. an expired developer agreement). Tagged releases stay strict:
+        # the verify step below refuses to ship anything not notarized.
+        continue-on-error: ${{ !startsWith(github.ref, 'refs/tags/') }}
         env:
           NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
           NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
