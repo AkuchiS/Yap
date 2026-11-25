@@ -61,6 +61,8 @@ def _screen_for(screens, x, y):
 
 
 _TALL = 220   # a focused "text box" taller than this is really a page/chat area
+_INPUT_CLEAR = 230   # big windows: sit this far above the bottom, clear of a chat
+                     # app's input box (Claude/ChatGPT/Messages keep it at the bottom)
 
 
 def place(kind: Optional[str], anchor, w: float, h: float, screens, mouse=(0, 0)):
@@ -69,9 +71,8 @@ def place(kind: Optional[str], anchor, w: float, h: float, screens, mouse=(0, 0)
     kind/anchor come from the focused app via Accessibility:
       "caret"  -> just under the text cursor (above it if that runs off-screen)
       "field"  -> just under a normal text box, else just above it
-      "window" or a tall "field" (a whole page/chat area, as Electron apps often
-               report) -> centred a little above the middle of that area, so it
-               never sits on the input box that chat apps keep at the bottom
+      "window" -> centred, just above where chat apps keep their input box
+      a tall "field" (a whole page/chat area) -> a little above its middle
       None     -> bottom-centre of the screen under the mouse (old behaviour)
     `screens` = visible frames, primary first. Always clamped on-screen.
     """
@@ -83,7 +84,11 @@ def place(kind: Optional[str], anchor, w: float, h: float, screens, mouse=(0, 0)
     bottom, top = vf[1], vf[1] + vf[3]
     area = kind == "window" or (kind == "field" and ah > _TALL)
     if area:
-        x, y = ax + (aw - w) / 2.0, ay + ah * 0.55 - h / 2.0
+        x = ax + (aw - w) / 2.0
+        if kind == "window" and ah > 600:
+            y = ay + _INPUT_CLEAR             # just above the input box
+        else:
+            y = ay + ah * 0.55 - h / 2.0      # a little above the middle
     else:
         x = ax - (12 if kind == "caret" else 0)
         y = ay - h - _GAP                       # below
@@ -115,7 +120,43 @@ _AX_ERRORS = {-25200: "failure", -25201: "illegal argument", -25202: "invalid el
               -25212: "no value"}
 
 
+def front_window():
+    """Frame of the frontmost app's front window, straight from the window server.
+    Needs no Accessibility answer from the app, so it works for Electron apps
+    (Claude, ChatGPT, Slack) that won't say where their text box is. Cocoa coords."""
+    try:
+        import Quartz
+        from AppKit import NSScreen, NSWorkspace
+
+        front = NSWorkspace.sharedWorkspace().frontmostApplication()
+        pid = front.processIdentifier() if front is not None else None
+        if pid is None:
+            return None
+        primary_h = NSScreen.screens()[0].frame().size.height
+        wins = Quartz.CGWindowListCopyWindowInfo(
+            Quartz.kCGWindowListOptionOnScreenOnly
+            | Quartz.kCGWindowListExcludeDesktopElements, Quartz.kCGNullWindowID)
+        for w in wins or []:   # front-to-back order
+            if w.get("kCGWindowOwnerPID") == pid and w.get("kCGWindowLayer") == 0:
+                b = w.get("kCGWindowBounds") or {}
+                if b.get("Width", 0) > 100 and b.get("Height", 0) > 100:
+                    return (b["X"], primary_h - b["Y"] - b["Height"],
+                            b["Width"], b["Height"])
+    except Exception:
+        pass
+    return None
+
+
 def focus_anchor():
+    kind, rect, note = _ax_anchor()
+    if kind is None:
+        wr = front_window()
+        if wr:
+            return "window", wr, note
+    return kind, rect, note
+
+
+def _ax_anchor():
     """Ask the focused app (via Accessibility, which Yap already has for pasting)
     where you're typing.
 

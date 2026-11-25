@@ -173,7 +173,7 @@ class Recorder:
         with stream:
             while not stop.is_set():
                 try:
-                    chunk = q.get(timeout=0.1)
+                    chunk = q.get(timeout=0.03)   # notice key-up quickly
                 except queue.Empty:
                     continue
                 chunks.append(chunk)

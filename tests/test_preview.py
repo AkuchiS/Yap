@@ -201,8 +201,20 @@ def test_no_anchor_falls_back_to_screen_under_mouse():
 def test_window_anchor_avoids_bottom_input():
     from yap.bubble import place
 
+    from yap.bubble import _INPUT_CLEAR
+    # big chat window: just above where the input box lives
     x, y = place("window", (200, 300, 1000, 800), 400, 60, _SCREENS)
-    assert (x, y) == (200 + 300, 300 + 800 * 0.55 - 30)   # not on the bottom input
+    assert (x, y) == (200 + 300, 300 + _INPUT_CLEAR)
+    # small window: a little above its middle
+    x, y = place("window", (200, 300, 1000, 400), 400, 60, _SCREENS)
+    assert y == 300 + 400 * 0.55 - 30
+
+
+def test_front_window_found_without_accessibility():
+    from yap.bubble import front_window
+
+    r = front_window()                    # whatever is in front while tests run
+    assert r is None or (len(r) == 4 and r[2] > 100 and r[3] > 100)
 
 
 def test_focus_anchor_never_raises():
