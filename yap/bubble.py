@@ -108,32 +108,23 @@ def _ax_rect(el, attr_pos="AXPosition", attr_size="AXSize"):
     return (p.x, p.y, z.width, z.height)
 
 
-_AX_ENABLED: set = set()   # app pids we've asked to expose their accessibility tree
-
-
-def _enable_app_ax(appel) -> bool:
-    """Electron apps (Claude, ChatGPT, Slack, VS Code…) don't publish where the
-    text cursor is unless asked: setting AXManualAccessibility on the app turns
-    their accessibility tree on. Harmless for other apps (they ignore it). Done
-    once per app process. Returns True if we just switched it on."""
-    from ApplicationServices import AXUIElementGetPid, AXUIElementSetAttributeValue
-    try:
-        err, pid = AXUIElementGetPid(appel, None)
-        if err or pid in _AX_ENABLED:
-            return False
-        _AX_ENABLED.add(pid)
-        AXUIElementSetAttributeValue(appel, "AXManualAccessibility", True)
-        return True
-    except Exception:
-        return False
+_AX_TIMEOUT = 0.2   # seconds per accessibility question; a busy app can't stall us
+_AX_ERRORS = {-25200: "failure", -25201: "illegal argument", -25202: "invalid element",
+              -25204: "app didn't answer in time", -25205: "attribute unsupported",
+              -25211: "Accessibility permission not granted / API disabled",
+              -25212: "no value"}
 
 
 def focus_anchor():
     """Ask the focused app (via Accessibility, which Yap already has for pasting)
-    where you're typing. Returns (kind, rect) in Cocoa coordinates, or (None, None)."""
-    try:
-        import time
+    where you're typing.
 
+    Returns (kind, rect, note): kind is "caret" | "field" | "window" | None, rect
+    is (x, y, w, h) in Cocoa coordinates, note explains a fallback. Safe to call
+    OFF the main thread — the menu-bar app does, so a slow app can never delay
+    the hotkey. (We deliberately do NOT flip AXManualAccessibility on Electron
+    apps: it forces them to mirror their whole UI and made Claude sluggish.)"""
+    try:
         from AppKit import NSScreen
         from ApplicationServices import (AXUIElementCopyAttributeValue,
                                          AXUIElementCopyParameterizedAttributeValue,
@@ -141,22 +132,15 @@ def focus_anchor():
                                          AXUIElementSetMessagingTimeout,
                                          AXValueGetValue, kAXValueCGRectType)
         sysw = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(sysw, 0.25)   # never hang on a busy app
+        AXUIElementSetMessagingTimeout(sysw, _AX_TIMEOUT)
         primary_h = NSScreen.screens()[0].frame().size.height
 
         def flip(r):  # AX: top-left origin, y down -> Cocoa: bottom-left, y up
             return (r[0], primary_h - r[1] - r[3], r[2], r[3])
 
-        err, appel = AXUIElementCopyAttributeValue(sysw, "AXFocusedApplication", None)
-        if err or appel is None:
-            return None, None
-        AXUIElementSetMessagingTimeout(appel, 0.25)
-        just_enabled = _enable_app_ax(appel)
-
-        def caret_or_field():
-            err, el = AXUIElementCopyAttributeValue(appel, "AXFocusedUIElement", None)
-            if err or el is None:
-                return None, None
+        err, el = AXUIElementCopyAttributeValue(sysw, "AXFocusedUIElement", None)
+        note = f"focused element: {_AX_ERRORS.get(err, err)}" if err else ""
+        if not err and el is not None:
             err, rng = AXUIElementCopyAttributeValue(el, "AXSelectedTextRange", None)
             if not err and rng is not None:
                 err, b = AXUIElementCopyParameterizedAttributeValue(
@@ -165,24 +149,22 @@ def focus_anchor():
                     ok, r = AXValueGetValue(b, kAXValueCGRectType, None)
                     if ok and r.size.height > 0 and (r.origin.x or r.origin.y):
                         return "caret", flip((r.origin.x, r.origin.y,
-                                              max(r.size.width, 1.0), r.size.height))
+                                              max(r.size.width, 1.0), r.size.height)), ""
             field = _ax_rect(el)
-            return ("field", flip(field)) if field else (None, None)
-
-        kind, rect = caret_or_field()
-        if just_enabled and kind != "caret":
-            time.sleep(0.15)            # Electron builds its tree on demand: retry once
-            kind, rect = caret_or_field()
-        if kind:
-            return kind, rect
+            if field:
+                return "field", flip(field), ""
+        err, appel = AXUIElementCopyAttributeValue(sysw, "AXFocusedApplication", None)
+        if err or appel is None:
+            return None, None, note or f"focused app: {_AX_ERRORS.get(err, err)}"
+        AXUIElementSetMessagingTimeout(appel, _AX_TIMEOUT)
         err, win = AXUIElementCopyAttributeValue(appel, "AXFocusedWindow", None)
         if not err and win is not None:
             wr = _ax_rect(win)
             if wr:
-                return "window", flip(wr)
-    except Exception:
-        pass
-    return None, None
+                return "window", flip(wr), note
+        return None, None, note or f"focused window: {_AX_ERRORS.get(err, err)}"
+    except Exception as e:
+        return None, None, f"error: {e}"
 
 
 class Bubble:
@@ -224,18 +206,19 @@ class Bubble:
         self._panel, self._bg, self._label = panel, bg, label
         self._hide_token = 0
         self._anchor = (None, None)   # where you're typing, fixed for the take
-        self._last_kind = "unset"
 
     # -- public (main thread only) ------------------------------------------
-    def listening(self) -> None:
-        """Key just went down: find where you're typing, then show a quiet
-        placeholder there until words arrive."""
-        self._anchor = focus_anchor()
-        kind, rect = self._anchor
+    def listening(self, anchor=None, ms: float = 0.0) -> None:
+        """Key just went down: show a quiet placeholder where you're typing.
+        `anchor` is focus_anchor()'s result, looked up off the main thread."""
+        kind, rect, note = anchor or (None, None, "not looked up")
+        self._anchor = (kind, rect)
+        label = kind or "screen"
         if kind == "field" and rect and rect[3] > _TALL:
-            kind = "field (tall: treated as page)"
+            label = "field (tall: treated as page)"
         import sys
-        print(f"yap: bubble placed by {kind or 'screen'}", file=sys.stderr)
+        extra = f" ({note})" if note else ""
+        print(f"yap: bubble placed by {label} in {ms:.0f} ms{extra}", file=sys.stderr)
         self._set("Listening…", muted=True)
 
     def text(self, words: str) -> None:

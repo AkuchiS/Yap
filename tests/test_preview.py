@@ -208,5 +208,7 @@ def test_window_anchor_avoids_bottom_input():
 def test_focus_anchor_never_raises():
     from yap.bubble import focus_anchor
 
-    kind, rect = focus_anchor()          # untrusted test process → graceful
+    kind, rect, note = focus_anchor()    # untrusted test process → graceful
     assert kind in (None, "caret", "field", "window")
+    if kind is None:
+        assert note                      # a fallback always says why

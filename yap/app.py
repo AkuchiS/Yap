@@ -182,6 +182,7 @@ class App:
         if not self._recording:
             return
         self._recording = False
+        self._released = time.monotonic()   # for the "pasted N s after release" log
         self._stop_event.set()
         self._status("transcribing")
         self._log("◼ processing…", 2)
@@ -317,6 +318,9 @@ class App:
             self._log(f"  ({secs:.1f}s audio, {dt:.1f}s transcribe)", 2)
             self.injector.inject(text)
             self._log("… injected at cursor", 2)
+            lag = time.monotonic() - getattr(self, "_released", time.monotonic())
+            self._log(f"  ⏱ {secs:.1f}s of speech, pasted {lag:.2f}s after release "
+                      f"(transcribe {dt:.2f}s)", 1)
             self._last_injection = text  # in-app relearn (hotkey / menu)
             try:  # also persist so the `yap relearn` CLI can use it
                 (config.config_dir() / "last_injection.txt").write_text(text, encoding="utf-8")

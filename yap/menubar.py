@@ -268,8 +268,25 @@ def run(cfg: dict[str, Any]) -> int:
             b = self._get_bubble()
             if b is None:
                 return
+            self._ui_state = state
             if state == "listening":
-                b.listening()
+                # Ask the focused app where the cursor is OFF the main thread: this
+                # thread also runs the hotkey tap, and a slow app must never stall it.
+                self._take_id = getattr(self, "_take_id", 0) + 1
+                take = self._take_id
+
+                def locate():
+                    import time
+                    from . import bubble as _bubble
+                    t0 = time.monotonic()
+                    anchor = _bubble.focus_anchor()
+                    ms = (time.monotonic() - t0) * 1000
+
+                    def show():
+                        if self._take_id == take and self._ui_state == "listening":
+                            b.listening(anchor, ms)
+                    self._main(show)
+                threading.Thread(target=locate, daemon=True).start()
             elif state == "transcribing":
                 b.finishing()
             else:  # idle: leave the pasted words up a moment, then go
