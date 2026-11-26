@@ -120,28 +120,40 @@ _AX_ERRORS = {-25200: "failure", -25201: "illegal argument", -25202: "invalid el
               -25212: "no value"}
 
 
-def front_window():
-    """Frame of the frontmost app's front window, straight from the window server.
+def pick_window(frames):
+    """The window you're most likely typing in, from an app's on-screen windows
+    (x, y, w, h). The biggest one: apps float small helper panels in front of
+    their main window (OpenAI's Codex/ChatGPT keeps two invisible 644x456
+    "Computer Use" overlays there), and those must never win."""
+    frames = [f for f in frames if f and f[2] > 100 and f[3] > 100]
+    return max(frames, key=lambda f: f[2] * f[3]) if frames else None
+
+
+def front_window(pid=None):
+    """Frame of the frontmost app's main window, straight from the window server.
     Needs no Accessibility answer from the app, so it works for Electron apps
     (Claude, ChatGPT, Slack) that won't say where their text box is. Cocoa coords."""
     try:
         import Quartz
         from AppKit import NSScreen, NSWorkspace
 
-        front = NSWorkspace.sharedWorkspace().frontmostApplication()
-        pid = front.processIdentifier() if front is not None else None
+        if pid is None:
+            front = NSWorkspace.sharedWorkspace().frontmostApplication()
+            pid = front.processIdentifier() if front is not None else None
         if pid is None:
             return None
         primary_h = NSScreen.screens()[0].frame().size.height
         wins = Quartz.CGWindowListCopyWindowInfo(
             Quartz.kCGWindowListOptionOnScreenOnly
             | Quartz.kCGWindowListExcludeDesktopElements, Quartz.kCGNullWindowID)
-        for w in wins or []:   # front-to-back order
-            if w.get("kCGWindowOwnerPID") == pid and w.get("kCGWindowLayer") == 0:
+        frames = []
+        for w in wins or []:
+            if (w.get("kCGWindowOwnerPID") == pid and w.get("kCGWindowLayer") == 0
+                    and float(w.get("kCGWindowAlpha", 1) or 0) > 0):
                 b = w.get("kCGWindowBounds") or {}
-                if b.get("Width", 0) > 100 and b.get("Height", 0) > 100:
-                    return (b["X"], primary_h - b["Y"] - b["Height"],
-                            b["Width"], b["Height"])
+                frames.append((b.get("X", 0), primary_h - b.get("Y", 0) - b.get("Height", 0),
+                               b.get("Width", 0), b.get("Height", 0)))
+        return pick_window(frames)
     except Exception:
         pass
     return None
@@ -152,8 +164,29 @@ def focus_anchor():
     if kind is None:
         wr = front_window()
         if wr:
-            return "window", wr, note
+            return "window", wr, (note + "; " if note else "") + "window list"
     return kind, rect, note
+
+
+def ax_main_window(pid):
+    """(rect in AX top-left coords, how) for the app's real document window,
+    skipping panels and overlays; None if the app won't say."""
+    from ApplicationServices import (AXUIElementCopyAttributeValue,
+                                     AXUIElementCreateApplication,
+                                     AXUIElementSetMessagingTimeout)
+    appel = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(appel, _AX_TIMEOUT)
+    for attr in ("AXFocusedWindow", "AXMainWindow"):
+        err, win = AXUIElementCopyAttributeValue(appel, attr, None)
+        if err or win is None:
+            continue
+        e2, sub = AXUIElementCopyAttributeValue(win, "AXSubrole", None)
+        if not e2 and sub not in (None, "AXStandardWindow"):
+            continue   # a panel/overlay, not where you type
+        wr = _ax_rect(win)
+        if wr:
+            return wr, f"{attr[2:]} via accessibility"
+    return None
 
 
 def _ax_anchor():
@@ -194,16 +227,19 @@ def _ax_anchor():
             field = _ax_rect(el)
             if field:
                 return "field", flip(field), ""
-        err, appel = AXUIElementCopyAttributeValue(sysw, "AXFocusedApplication", None)
-        if err or appel is None:
-            return None, None, note or f"focused app: {_AX_ERRORS.get(err, err)}"
-        AXUIElementSetMessagingTimeout(appel, _AX_TIMEOUT)
-        err, win = AXUIElementCopyAttributeValue(appel, "AXFocusedWindow", None)
-        if not err and win is not None:
-            wr = _ax_rect(win)
-            if wr:
-                return "window", flip(wr), note
-        return None, None, note or f"focused window: {_AX_ERRORS.get(err, err)}"
+        # The app's own main window. Ask the frontmost app directly (not via the
+        # system-wide element) and skip helper panels: Codex/ChatGPT's focused
+        # "window" can be an invisible Computer Use overlay, not the chat.
+        from AppKit import NSWorkspace
+
+        front = NSWorkspace.sharedWorkspace().frontmostApplication()
+        if front is None:
+            return None, None, note or "no frontmost app"
+        found = ax_main_window(front.processIdentifier())
+        if found:
+            wr, how = found
+            return "window", flip(wr), (note + "; " if note else "") + how
+        return None, None, note or "no standard window"
     except Exception as e:
         return None, None, f"error: {e}"
 

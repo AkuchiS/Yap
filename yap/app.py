@@ -361,10 +361,28 @@ class App:
         warn = combo_warning(combo)
         if warn:
             self._log(f"yap: warning: {warn}", 0)
+        t0 = time.monotonic()
         try:
             self.engine.warmup()
         except Exception as e:
             self._log(f"yap: warmup failed: {e}", 0)
+            if getattr(self.engine, "backend", None):   # Parakeet couldn't load
+                # (offline on first run, disk full, broken GPU stack...) — dictation
+                # must still work, so drop back to Whisper rather than fail later.
+                from .stt.local_whisper import LocalWhisperEngine
+
+                self.engine = LocalWhisperEngine(self.cfg["local"],
+                                                 prompt=getattr(self.engine, "prompt", None))
+                try:
+                    self.engine.warmup()
+                except Exception as e2:
+                    self._log(f"yap: Whisper warmup failed too: {e2}", 0)
+        if hasattr(self.engine, "resolved_model"):
+            try:
+                self._log(f"yap: speech model {self.engine.resolved_model()} ready in "
+                          f"{time.monotonic() - t0:.1f}s", 0)
+            except Exception:
+                pass
         self._status("idle")
         # optional second global hotkey: learn from your last correction
         # Control socket: lets an external trigger drive dictation. Essential on

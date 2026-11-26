@@ -25,6 +25,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # "cloud"  -> OpenAI-compatible /audio/transcriptions endpoint (BYOK)
     "engine": "local",
     "local": {
+        # Which on-device model: "auto" = Parakeet on Apple Silicon Macs (runs on
+        # the GPU, ~7x faster than Whisper), Whisper on everything else.
+        # "parakeet" forces Parakeet (CPU via ONNX off Apple Silicon); "whisper"
+        # forces the original engine. The settings below are Whisper's.
+        "backend": "auto",
         # "auto" picks a model to match your machine (tiny/base on old hardware,
         # small on modern). Or pin one: tiny.en|base.en|small|medium|large-v3 …
         "model": "auto",

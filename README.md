@@ -326,8 +326,24 @@ Engines:
 
 | `engine` | What runs | Cost | Privacy |
 |---|---|---|---|
-| `local` *(default)* | faster-whisper on your CPU/GPU | free | audio never leaves the machine |
+| `local` *(default)* | Parakeet or faster-whisper on your machine (see below) | free | audio never leaves the machine |
 | `cloud` | any OpenAI-compatible `/audio/transcriptions` | your key | audio sent to that endpoint |
+
+Which on-device model `local` runs (`local.backend`):
+
+| Machine | `auto` *(default)* picks | Why |
+|---|---|---|
+| Apple Silicon Mac (M1 and later) | **Parakeet** on the GPU (MLX) | ~7× faster: 22 s of speech in ~0.3 s vs ~1.8 s (M5 Max) |
+| Intel Mac, Windows, Linux | **Whisper** (faster-whisper; CUDA if you have an NVIDIA GPU) | Parakeet on a CPU is only a little faster than Whisper there |
+
+Parakeet works on every OS. To try it on Windows, Linux or an Intel Mac:
+`pip install "yap-dictation[parakeet]"`, then
+`yap config set local.backend '"parakeet"'` (runs on the CPU via ONNX).
+Force the original engine anywhere with `yap config set local.backend '"whisper"'`.
+If Parakeet can't load (for example, offline on first run, before its one-off
+download: about 2.5 GB on a Mac, 1.2 GB for the ONNX build), Yap falls back to
+Whisper automatically. Parakeet ignores the Whisper vocabulary prompt; your
+vocabulary still fixes spelling and casing after recognition.
 
 Local model sizes (set `local.model`): `auto` *(default — adapts to your
 machine)*, `tiny.en`, `base.en`, `small`, `medium`, `large-v3`. Bigger = more

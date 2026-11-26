@@ -35,11 +35,15 @@ dependencies = [
 clipboard = ["pyperclip>=1.8"]
 # macOS menu-bar app (`yap app`). AVFoundation is used to explicitly request the
 # Microphone grant (CoreAudio stream-open doesn't reliably prompt for our app).
-macos = ["rumps>=0.4.0; sys_platform == 'darwin'", "pyobjc-framework-AVFoundation>=9.0; sys_platform == 'darwin'"]
+macos = ["rumps>=0.4.0; sys_platform == 'darwin'", "parakeet-mlx>=0.7; sys_platform == 'darwin' and platform_machine == 'arm64'", "pyobjc-framework-AVFoundation>=9.0; sys_platform == 'darwin'"]
+# Parakeet speech model. On Apple Silicon this is the fast GPU engine (picked
+# automatically); elsewhere it's the cross-platform ONNX build (opt in with
+# `yap config set local.backend '"parakeet"'`).
+parakeet = ["parakeet-mlx>=0.7; sys_platform == 'darwin' and platform_machine == 'arm64'", "onnx-asr[cpu,hub]>=0.12; sys_platform != 'darwin' or platform_machine != 'arm64'"]
 # OS-appropriate icon shaping for `yap icon`.
 icons = ["pillow>=9.0"]
 # Everything for the best desktop experience.
-full = ["pyperclip>=1.8", "pillow>=9.0", "rumps>=0.4.0; sys_platform == 'darwin'", "pyobjc-framework-AVFoundation>=9.0; sys_platform == 'darwin'", "pystray>=0.19.4; sys_platform != 'darwin'"]
+full = ["pyperclip>=1.8", "parakeet-mlx>=0.7; sys_platform == 'darwin' and platform_machine == 'arm64'", "pillow>=9.0", "rumps>=0.4.0; sys_platform == 'darwin'", "pyobjc-framework-AVFoundation>=9.0; sys_platform == 'darwin'", "pystray>=0.19.4; sys_platform != 'darwin'"]
 
 [project.scripts]
 yap = "yap.cli:main"

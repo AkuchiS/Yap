@@ -58,6 +58,13 @@ for pkg in ("av", "sounddevice", "pynput", "pyperclip", "rumps", "PIL", "numpy",
             "certifi"):
     _collect(pkg)
 
+# Parakeet: Apple-GPU build on Apple Silicon (mlx ships Metal kernels as data
+# files, so collect it whole), ONNX build elsewhere. Optional — the app falls
+# back to Whisper if they're missing.
+for pkg in ("parakeet_mlx", "mlx", "onnx_asr", "huggingface_hub", "dacite",
+            "librosa"):
+    _collect(pkg)
+
 # pyobjc bits the menu-bar app needs on macOS (rumps' deps + permission APIs).
 if sys.platform == "darwin":
     hiddenimports += ["objc", "Foundation", "AppKit", "PyObjCTools",

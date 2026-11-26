@@ -224,3 +224,13 @@ def test_focus_anchor_never_raises():
     assert kind in (None, "caret", "field", "window")
     if kind is None:
         assert note                      # a fallback always says why
+
+
+def test_helper_overlay_never_beats_main_window():
+    from yap.bubble import pick_window
+
+    overlay = (156, 1440, 644, 456)        # Codex "Computer Use" panel, listed first
+    main = (0, 1440, 1280, 1234)
+    assert pick_window([overlay, overlay, main]) == main
+    assert pick_window([(0, 0, 50, 900)]) is None   # slivers ignored
+    assert pick_window([]) is None
