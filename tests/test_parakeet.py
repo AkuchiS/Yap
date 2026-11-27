@@ -44,3 +44,18 @@ def test_backend_auto_resolves_per_machine(monkeypatch):
 def test_mlx_never_claimed_off_apple_silicon(monkeypatch):
     monkeypatch.setattr(pk, "apple_silicon", lambda: False)
     assert pk.mlx_available() is False
+
+
+def test_gpu_cache_is_capped_and_freed(monkeypatch):
+    """Regression: MLX's buffer cache grew to 45 GB because every dictation is
+    a different length. The engine must cap it and clear it after each pass."""
+    assert pk._CACHE_LIMIT <= 1024 ** 3
+    _fake(monkeypatch, mlx=True, onnx=False)
+    e = pk.ParakeetEngine({})
+    freed = []
+    monkeypatch.setattr(e, "_ensure_model", lambda: object())
+    monkeypatch.setattr(e, "_run", lambda m, a: "hi")
+    monkeypatch.setattr(e, "_free", lambda: freed.append(1))
+    import numpy as np
+    assert e.transcribe_array(np.zeros(16000, np.float32), 16000) == "hi"
+    assert freed == [1]

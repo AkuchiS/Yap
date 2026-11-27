@@ -22,6 +22,7 @@ import numpy as np
 
 MLX_MODEL = "mlx-community/parakeet-tdt-0.6b-v3"
 ONNX_MODEL = "nemo-parakeet-tdt-0.6b-v3"
+_CACHE_LIMIT = 512 * 1024 ** 2   # bytes of freed GPU buffers MLX may keep
 
 
 def apple_silicon() -> bool:
@@ -70,7 +71,14 @@ class ParakeetEngine:
         if self._model is not None:
             return self._model
         if self.backend == "mlx":
+            import mlx.core as mx
             from parakeet_mlx import from_pretrained
+
+            # MLX keeps every freed GPU buffer for reuse. Each dictation (and
+            # each live-preview pass) is a different length, so nothing is ever
+            # reused and the cache only grows: 45 GB after a day on an M5 Max,
+            # with decodes slowing from 0.3 s to 14 s. Keep it small.
+            mx.set_cache_limit(_CACHE_LIMIT)
 
             self._model = from_pretrained(self.cfg.get("parakeet_model") or MLX_MODEL)
         else:
@@ -89,6 +97,7 @@ class ParakeetEngine:
             noise = np.random.default_rng(0).normal(0, 1e-3, 16000 * 20).astype(np.float32)
             for secs in (1, 4, 10, 20):
                 self._run(model, noise[:16000 * secs])
+            self._free()
 
     def _run(self, model, audio: "np.ndarray") -> str:
         if audio.size < 1600:   # under 0.1 s: nothing to hear
@@ -103,7 +112,31 @@ class ParakeetEngine:
 
     def _decode(self, audio: "np.ndarray") -> str:
         with self._lock:
-            return self._run(self._ensure_model(), audio)
+            try:
+                return self._run(self._ensure_model(), audio)
+            finally:
+                self._free()
+
+    def _free(self) -> None:
+        """Hand freed GPU buffers back to macOS after every pass."""
+        if self.backend == "mlx":
+            try:
+                import mlx.core as mx
+
+                mx.clear_cache()
+            except Exception:
+                pass
+
+    def gpu_memory_gb(self) -> float:
+        """GPU memory this engine holds right now (model + cache), for the log."""
+        if self.backend != "mlx" or self._model is None:
+            return 0.0
+        try:
+            import mlx.core as mx
+
+            return (mx.get_active_memory() + mx.get_cache_memory()) / 1e9
+        except Exception:
+            return 0.0
 
     def transcribe_array(self, samples: "np.ndarray", samplerate: int) -> str:
         audio = np.asarray(samples, dtype=np.float32).reshape(-1)

@@ -319,8 +319,9 @@ class App:
             self.injector.inject(text)
             self._log("… injected at cursor", 2)
             lag = time.monotonic() - getattr(self, "_released", time.monotonic())
+            gpu = getattr(self.engine, "gpu_memory_gb", lambda: 0.0)()
             self._log(f"  ⏱ {secs:.1f}s of speech, pasted {lag:.2f}s after release "
-                      f"(transcribe {dt:.2f}s)", 1)
+                      f"(transcribe {dt:.2f}s)" + (f", GPU {gpu:.1f} GB" if gpu else ""), 1)
             self._last_injection = text  # in-app relearn (hotkey / menu)
             try:  # also persist so the `yap relearn` CLI can use it
                 (config.config_dir() / "last_injection.txt").write_text(text, encoding="utf-8")
